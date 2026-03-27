@@ -22,6 +22,8 @@ func main() {
 
 	gameManager := NewGameManager()
 
+	http.HandleFunc("/create", gameManager.HandleCreate)
+	http.HandleFunc("/practice", gameManager.HandlePractice)
 	http.HandleFunc("/rooms", gameManager.HandleLobby)
 	http.HandleFunc("/rooms/", gameManager.HandleGame)
 

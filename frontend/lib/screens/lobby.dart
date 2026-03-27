@@ -18,8 +18,12 @@ class _LobbyScreenState extends State<LobbyScreen> {
     _wsService = Provider.of<WebSocketService>(context, listen: false);
     _wsService.connectToLobby('ws://192.168.1.57:8080/rooms');
     
-    _wsService.roomStream.listen((roomID) {
-      if (mounted) {
+    _wsService.roomStream.listen((message) {
+      if (!mounted) return;
+      
+      final parts = message.split(':');
+      if (parts.length >= 2 && parts[0] == 'JOIN') {
+        final roomID = parts[1];
         Navigator.pushReplacementNamed(
           context, 
           '/game', 

@@ -3,18 +3,23 @@ package main
 import (
 	"fmt"
 	"log"
+	"math/rand"
+	"os"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/notnil/chess"
 )
 
 type Room struct {
-	ID      string
-	Game    *chess.Game
-	Players map[*websocket.Conn]string // Conn -> Color (white or black)
-	mu      sync.Mutex
-	started bool
+	ID        string
+	Game      *chess.Game
+	Players   map[*websocket.Conn]string // Conn -> Color (white or black)
+	mu        sync.Mutex
+	started   bool
+	IsBotGame bool
+	BotColor  string
 }
 
 func NewRoom(id string) *Room {
@@ -43,10 +48,17 @@ func (r *Room) Join(conn *websocket.Conn) {
 
 	log.Printf("Player joined room %s as %s", r.ID, color)
 
-	if len(r.Players) == 2 {
+	if len(r.Players) == 2 || (r.IsBotGame && len(r.Players) == 1) {
 		r.started = true
 		r.broadcastColors()
-		go r.handleGame()
+		r.broadcastBoard("") // Initial board
+		r.notifyTurn()
+		if !r.IsBotGame {
+			go r.handleGame()
+		} else {
+			// In bot game, we only have one player connection to listen to
+			go r.handleGame()
+		}
 	}
 }
 
@@ -54,14 +66,31 @@ func (r *Room) broadcastColors() {
 	for conn, color := range r.Players {
 		conn.WriteMessage(websocket.TextMessage, []byte(color))
 	}
-	// Also send initial board state
-	r.broadcastBoard()
 }
 
-func (r *Room) broadcastBoard() {
+func (r *Room) broadcastBoard(lastMove string) {
 	fen := r.Game.Position().String()
+	msg := "BOARD:" + fen
+	if lastMove != "" {
+		msg += ":" + lastMove
+	}
+
+	// Format move history
+	moves := r.Game.Moves()
+	history := ""
+	for i := 0; i < len(moves); i++ {
+		if i%2 == 0 {
+			history += fmt.Sprintf("%d. ", (i/2)+1)
+		}
+		// Use SAN notation for history
+		history += chess.AlgebraicNotation{}.Encode(r.Game.Positions()[i], moves[i]) + " "
+	}
+
 	for conn := range r.Players {
-		conn.WriteMessage(websocket.TextMessage, []byte("BOARD:"+fen))
+		conn.WriteMessage(websocket.TextMessage, []byte(msg))
+		if history != "" {
+			conn.WriteMessage(websocket.TextMessage, []byte("MOVES:"+history))
+		}
 	}
 }
 
@@ -82,6 +111,11 @@ func (r *Room) handleGame() {
 }
 
 func (r *Room) processMove(conn *websocket.Conn, moveStr string) {
+	if moveStr == "RESTART" {
+		r.Restart()
+		return
+	}
+
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -92,15 +126,21 @@ func (r *Room) processMove(conn *websocket.Conn, moveStr string) {
 		return
 	}
 
-	// Expecting move in long algebraic notation (e.g. e2e4)
-	err := r.Game.MoveStr(moveStr)
+	// Expecting move in UCI notation (e.g. e2e4)
+	move, err := chess.UCINotation{}.Decode(r.Game.Position(), moveStr)
 	if err != nil {
 		conn.WriteMessage(websocket.TextMessage, []byte("ERROR:Invalid move: "+err.Error()))
 		return
 	}
 
+	err = r.Game.Move(move)
+	if err != nil {
+		conn.WriteMessage(websocket.TextMessage, []byte("ERROR:Move execution failed: "+err.Error()))
+		return
+	}
+
 	// Move successful, broadcast new state
-	r.broadcastBoard()
+	r.broadcastBoard(moveStr)
 
 	// Check if game ended
 	if r.Game.Outcome() != chess.NoOutcome {
@@ -119,6 +159,51 @@ func (r *Room) notifyTurn() {
 	for conn := range r.Players {
 		conn.WriteMessage(websocket.TextMessage, []byte("TURN:"+turn))
 	}
+
+	// If it's the bot's turn, trigger it
+	if r.IsBotGame && turn == r.BotColor && r.Game.Outcome() == chess.NoOutcome {
+		go r.makeBotMove()
+	}
+}
+
+func (r *Room) makeBotMove() {
+	// Add a delay for realism
+	time.Sleep(1500 * time.Millisecond)
+
+	r.mu.Lock()
+	moves := r.Game.ValidMoves()
+	if len(moves) == 0 {
+		r.mu.Unlock()
+		return
+	}
+
+	// Pick a random move
+	move := moves[rand.Intn(len(moves))]
+	moveStr := move.String()
+	r.mu.Unlock()
+
+	log.Printf("Bot making move: %s", moveStr)
+	
+	// We call processMove but we need a way to pass "nil" connection or bypass the check
+	r.applyBotMove(moveStr)
+}
+
+func (r *Room) applyBotMove(moveStr string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	move, _ := chess.UCINotation{}.Decode(r.Game.Position(), moveStr)
+	r.Game.Move(move)
+
+	// Move successful, broadcast new state
+	r.broadcastBoard(moveStr)
+
+	// Check if game ended
+	if r.Game.Outcome() != chess.NoOutcome {
+		r.broadcastGameOver()
+	} else {
+		r.notifyTurn()
+	}
 }
 
 func (r *Room) broadcastGameOver() {
@@ -127,5 +212,40 @@ func (r *Room) broadcastGameOver() {
 	msg := fmt.Sprintf("GAMEOVER:%s by %s", outcome, method)
 	for conn := range r.Players {
 		conn.WriteMessage(websocket.TextMessage, []byte(msg))
+	}
+
+	// Log game for persistence
+	r.logGame()
+}
+
+func (r *Room) logGame() {
+	log.Printf("Saving game %s: %s by %s", r.ID, r.Game.Outcome(), r.Game.Method())
+	// In a real app, this would go to a DB. For now, we use a log file.
+	f, err := os.OpenFile("games.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		log.Println("Error opening log file:", err)
+		return
+	}
+	defer f.Close()
+
+	entry := fmt.Sprintf("ID: %s | Outcome: %s | Method: %s | FEN: %s\n", 
+		r.ID, r.Game.Outcome(), r.Game.Method(), r.Game.Position().String())
+	if _, err := f.WriteString(entry); err != nil {
+		log.Println("Error writing to log file:", err)
+	}
+}
+
+func (r *Room) Restart() {
+	r.mu.Lock()
+	r.Game = chess.NewGame()
+	r.mu.Unlock()
+
+	log.Printf("Game restarted in room %s", r.ID)
+	r.broadcastBoard("") // Reset board (no last move)
+	r.notifyTurn()
+
+	// Notify clients that game was reset
+	for conn := range r.Players {
+		conn.WriteMessage(websocket.TextMessage, []byte("RESTARTED"))
 	}
 }

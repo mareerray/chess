@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -19,7 +20,7 @@ type GameManager struct {
 func NewGameManager() *GameManager {
 	gm := &GameManager{
 		rooms:      make(map[string]*Room),
-		waitingRoom: make(chan *websocket.Conn, 1),
+		waitingRoom: make(chan *websocket.Conn, 10),
 	}
 	go gm.matchmaking()
 	return gm
@@ -37,13 +38,13 @@ func (gm *GameManager) matchmaking() {
 		gm.rooms[roomID] = room
 		gm.mu.Unlock()
 
-		// Notify both players of the room ID
-		player1.WriteMessage(websocket.TextMessage, []byte(roomID))
-		player2.WriteMessage(websocket.TextMessage, []byte(roomID))
-
-		// Close lobby connections after sending room ID
-		player1.Close()
-		player2.Close()
+		log.Printf("Match found! Creating room %s\n", roomID)
+		
+		// Notify both players of the room ID and their colors
+		player1.WriteMessage(websocket.TextMessage, []byte("JOIN:"+roomID+":white"))
+		player2.WriteMessage(websocket.TextMessage, []byte("JOIN:"+roomID+":black"))
+		
+		// Note: Don't close immediately, let the client's navigation trigger closure
 	}
 }
 
@@ -53,7 +54,36 @@ func (gm *GameManager) HandleLobby(w http.ResponseWriter, r *http.Request) {
 		log.Println("Upgrade error:", err)
 		return
 	}
+	log.Println("Player entered lobby")
 	gm.waitingRoom <- conn
+}
+
+func (gm *GameManager) HandleCreate(w http.ResponseWriter, r *http.Request) {
+	roomID := strings.ToUpper(uuid.New().String()[:6]) // Short code for easier sharing
+	room := NewRoom(roomID)
+
+	gm.mu.Lock()
+	gm.rooms[roomID] = room
+	gm.mu.Unlock()
+
+	log.Printf("Private room created: %s\n", roomID)
+	w.Header().Set("Content-Type", "application/json")
+	fmt.Fprintf(w, `{"roomID": "%s"}`, roomID)
+}
+
+func (gm *GameManager) HandlePractice(w http.ResponseWriter, r *http.Request) {
+	roomID := strings.ToUpper(uuid.New().String()[:6]) + "_BOT"
+	room := NewRoom(roomID)
+	room.IsBotGame = true
+	room.BotColor = "black"
+
+	gm.mu.Lock()
+	gm.rooms[roomID] = room
+	gm.mu.Unlock()
+
+	log.Printf("Practice room created: %s", roomID)
+	w.Header().Set("Content-Type", "application/json")
+	fmt.Fprintf(w, `{"roomID": "%s"}`, roomID)
 }
 
 func (gm *GameManager) HandleGame(w http.ResponseWriter, r *http.Request) {
@@ -69,6 +99,7 @@ func (gm *GameManager) HandleGame(w http.ResponseWriter, r *http.Request) {
 	gm.mu.Unlock()
 
 	if !exists {
+		// Attempt to join by the exact ID (case-sensitive for short codes)
 		http.Error(w, "Room not found", http.StatusNotFound)
 		return
 	}
