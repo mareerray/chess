@@ -88,7 +88,7 @@ func (gm *GameManager) HandlePractice(w http.ResponseWriter, r *http.Request) {
 
 func (gm *GameManager) HandleGame(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
-	roomID := strings.TrimPrefix(path, "/rooms/")
+	roomID := strings.ToUpper(strings.TrimPrefix(path, "/rooms/"))
 	if roomID == "" {
 		http.Error(w, "Room ID required", http.StatusBadRequest)
 		return
@@ -99,7 +99,7 @@ func (gm *GameManager) HandleGame(w http.ResponseWriter, r *http.Request) {
 	gm.mu.Unlock()
 
 	if !exists {
-		// Attempt to join by the exact ID (case-sensitive for short codes)
+		log.Printf("Join failed: Room %s not found\n", roomID)
 		http.Error(w, "Room not found", http.StatusNotFound)
 		return
 	}

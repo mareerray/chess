@@ -97,10 +97,17 @@ func (r *Room) broadcastBoard(lastMove string) {
 func (r *Room) handleGame() {
 	for conn := range r.Players {
 		go func(c *websocket.Conn) {
+			defer func() {
+				r.mu.Lock()
+				delete(r.Players, c)
+				r.mu.Unlock()
+				c.Close()
+				log.Printf("Player disconnected from room %s. Remaining: %d", r.ID, len(r.Players))
+			}()
+
 			for {
 				_, msg, err := c.ReadMessage()
 				if err != nil {
-					log.Println("Read error:", err)
 					return
 				}
 
