@@ -22,6 +22,7 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
   String? _lastMoveFrom;
   String? _lastMoveTo;
   String _moveHistory = "";
+  String? _assignedColor;
 
   @override
   void didChangeDependencies() {
@@ -268,7 +269,7 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
       decoration: BoxDecoration(
-        color: isTurn ? const Color(0xFFE94560).withOpacity(0.2) : Colors.transparent,
+        color: isTurn ? const Color(0xFFE94560).withValues(alpha: 0.2) : Colors.transparent,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
@@ -340,11 +341,11 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
       },
       child: Container(
         color: isSelected 
-          ? Colors.yellow.withOpacity(0.5) 
+          ? Colors.yellow.withValues(alpha: 0.5) 
           : isPossible 
-            ? Colors.green.withOpacity(0.5)
+            ? Colors.green.withValues(alpha: 0.5)
             : isLastMove
-              ? Colors.blue.withOpacity(0.3)
+              ? Colors.blue.withValues(alpha: 0.3)
               : (isDark ? const Color(0xFFB58863) : const Color(0xFFF0D9B5)),
         child: _buildPiece(square),
       ),
@@ -368,7 +369,7 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
           color: isWhitePiece ? Colors.white : Colors.black,
           shadows: [
             Shadow(
-              color: isWhitePiece ? Colors.black.withOpacity(0.5) : Colors.white.withOpacity(0.3),
+              color: isWhitePiece ? Colors.black.withValues(alpha: 0.5) : Colors.white.withValues(alpha: 0.3),
               blurRadius: 4,
               offset: const Offset(0, 1),
             ),
@@ -408,7 +409,7 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
       height: 48,
       padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
+        color: Colors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Center(
