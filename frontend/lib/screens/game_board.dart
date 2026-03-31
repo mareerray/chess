@@ -141,8 +141,8 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
           _selectedSquare = null;
           _possibleMoves = [];
         } else if (_possibleMoves.contains(square)) {
-          final moveStr = "$_selectedSquare$square";
-          _wsService.sendMove(moveStr);
+          final piece = _chess.get(_selectedSquare!);
+          _handleMove(square, piece);
           _selectedSquare = null;
           _possibleMoves = [];
         } else {
@@ -162,6 +162,76 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
         }
       }
     });
+  }
+
+  void _handleMove(String square, chess_lib.Piece? piece) async {
+    String moveStr = "$_selectedSquare$square";
+    
+    // Check for promotion
+    if (piece?.type == chess_lib.PieceType.PAWN) {
+      bool isPromotion = (_myColor == "white" && square.endsWith("8")) ||
+                         (_myColor == "black" && square.endsWith("1"));
+      
+      if (isPromotion) {
+        final promotion = await _showPromotionDialog(piece!.color);
+        if (promotion != null) {
+          moveStr += promotion;
+        } else {
+          return; // Cancelled
+        }
+      }
+    }
+    
+    _wsService.sendMove(moveStr);
+  }
+
+  Future<String?> _showPromotionDialog(chess_lib.Color color) async {
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 4, sigmaY: 4),
+          child: AlertDialog(
+            backgroundColor: const Color(0xFF262421),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: const Text(
+              "Promote Pawn", 
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)
+            ),
+            content: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _promotionOption(chess_lib.PieceType.QUEEN, color, 'q'),
+                _promotionOption(chess_lib.PieceType.KNIGHT, color, 'n'),
+                _promotionOption(chess_lib.PieceType.ROOK, color, 'r'),
+                _promotionOption(chess_lib.PieceType.BISHOP, color, 'b'),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _promotionOption(chess_lib.PieceType type, chess_lib.Color color, String code) {
+    return GestureDetector(
+      onTap: () => Navigator.of(context).pop(code),
+      child: Container(
+        width: 60,
+        height: 60,
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white10),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: _renderSvgPiece(chess_lib.Piece(type, color)),
+        ),
+      ),
+    );
   }
 
   void _showGameOver(String reason) {
@@ -516,8 +586,8 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
         ),
         child: Container(
           color: isSelected 
-              ? Colors.yellow.withValues(alpha: 0.4) 
-              : (isLastMove ? Colors.black.withValues(alpha: 0.15) : Colors.transparent),
+              ? Colors.orange.withValues(alpha: 0.5) 
+              : (isLastMove ? Colors.yellow.withValues(alpha: 0.35) : Colors.transparent),
           child: Stack(
             children: [
               // Coordinates labels on specific squares
