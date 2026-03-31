@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:chess/chess.dart' as chess_lib;
 import 'package:flutter_svg/flutter_svg.dart';
+import 'analysis_screen.dart';
 import '../services/websocket_service.dart';
 import '../services/chess_pieces_svg.dart';
 
@@ -26,10 +27,13 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
   List<String> _possibleMoves = [];
   String? _lastMoveFrom;
   String? _lastMoveTo;
+  List<String> _fenHistory = []; // Track FENs for analysis
   String _moveHistory = "";
   String? _assignedColor;
   bool _isInitialized = false;
-
+  bool _opponentLeft = false;
+  
+  // High-fidelity board colors (Modern Wood)
   late ImageProvider _lightSquareImg;
   late ImageProvider _darkSquareImg;
 
@@ -66,6 +70,7 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
     }
     _wsService.connectToGame(wsUrl);
     _chess = chess_lib.Chess();
+    _fenHistory = [_chess.fen]; // Initialize starting FEN
   }
 
   void _setupListeners() {
@@ -78,6 +83,7 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
             final parts = message.split(":");
             final fen = parts[1];
             _chess.load(fen);
+            _fenHistory.add(fen); // Record position
             if (parts.length > 2) {
               final move = parts[2];
               if (move.length >= 4) {
@@ -97,7 +103,16 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
             _lastMoveTo = null;
             _selectedSquare = null;
             _possibleMoves = [];
+            _fenHistory = [_chess.fen]; // Reset history with starting position
+            _opponentLeft = false; // Reset left status
             HapticFeedback.vibrate();
+          } else if (message.startsWith("OPPONENT_LEFT")) {
+            setState(() {
+              _opponentLeft = true;
+            });
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text("Your opponent has left the game.")),
+            );
           } else if (message.startsWith("TURN:")) {
             _turn = message.substring(5);
           } else if (message.startsWith("GAMEOVER:")) {
@@ -142,7 +157,8 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
           _possibleMoves = [];
         } else if (_possibleMoves.contains(square)) {
           final piece = _chess.get(_selectedSquare!);
-          _handleMove(square, piece);
+          final fromSquare = _selectedSquare!; // Capture it!
+          _handleMove(fromSquare, square, piece);
           _selectedSquare = null;
           _possibleMoves = [];
         } else {
@@ -164,18 +180,18 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
     });
   }
 
-  void _handleMove(String square, chess_lib.Piece? piece) async {
-    String moveStr = "$_selectedSquare$square";
+  void _handleMove(String from, String to, chess_lib.Piece? piece) async {
+    String moveStr = "$from$to";
     
     // Check for promotion
     if (piece?.type == chess_lib.PieceType.PAWN) {
-      bool isPromotion = (_myColor == "white" && square.endsWith("8")) ||
-                         (_myColor == "black" && square.endsWith("1"));
+      bool isPromotion = (_myColor == "white" && to.endsWith("8")) ||
+                         (_myColor == "black" && to.endsWith("1"));
       
       if (isPromotion) {
         final promotion = await _showPromotionDialog(piece!.color);
         if (promotion != null) {
-          moveStr += promotion;
+          moveStr = "$from$to$promotion";
         } else {
           return; // Cancelled
         }
@@ -319,9 +335,33 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
                   height: 52,
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF27AE60), // Match success green
-                      foregroundColor: Colors.white,
-                      elevation: 0,
+                      backgroundColor: _opponentLeft 
+                          ? Colors.white10 
+                          : const Color(0xFFE94560),
+                      foregroundColor: _opponentLeft 
+                          ? Colors.white30 
+                          : Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      elevation: _opponentLeft ? 0 : 8,
+                      shadowColor: const Color(0xFFE94560).withValues(alpha: 0.4),
+                    ),
+                    onPressed: _opponentLeft ? null : () {
+                      _wsService.sendMove("RESTART");
+                    },
+                    child: Text(
+                      _opponentLeft ? "OPPONENT LEFT" : "REMATCH",
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1.1),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Color(0xFF27AE60), width: 1.5),
+                      foregroundColor: const Color(0xFF27AE60),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                       textStyle: const TextStyle(
                         fontSize: 16, 
@@ -330,9 +370,17 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
                       ),
                     ),
                     onPressed: () {
-                      _wsService.sendMove("RESTART");
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => AnalysisScreen(
+                            fenHistory: _fenHistory,
+                            moveHistory: _moveHistory,
+                            myColor: _myColor,
+                          ),
+                        ),
+                      );
                     },
-                    child: const Text("REMATCH"),
+                    child: const Text("ANALYZE"),
                   ),
                 ),
                 const SizedBox(height: 12),

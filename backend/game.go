@@ -115,6 +115,14 @@ func (r *Room) broadcastBoard(lastMove string) {
 	}
 }
 
+func (r *Room) Broadcast(msg string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for conn := range r.Players {
+		conn.WriteMessage(websocket.TextMessage, []byte(msg))
+	}
+}
+
 func (r *Room) handlePlayer(conn *websocket.Conn) {
 	defer func() {
 		r.mu.Lock()
@@ -124,6 +132,11 @@ func (r *Room) handlePlayer(conn *websocket.Conn) {
 		
 		conn.Close()
 		log.Printf("[-] DISCONNECTED: Player left room %s. (Remaining: %d)", r.ID, remaining)
+
+		// Notify remaining player if this was a multiplayer game
+		if !r.IsBotGame && remaining == 1 {
+			r.Broadcast("OPPONENT_LEFT")
+		}
 	}()
 
 	for {

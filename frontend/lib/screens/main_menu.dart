@@ -135,7 +135,7 @@ class MainMenuScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   _MenuButton(
-                    title: 'PRACTICE',
+                    title: 'PLAY BOT',
                     onPressed: () => _startPractice(context),
                   ),
                 ],
