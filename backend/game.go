@@ -119,9 +119,11 @@ func (r *Room) handlePlayer(conn *websocket.Conn) {
 	defer func() {
 		r.mu.Lock()
 		delete(r.Players, conn)
+		remaining := len(r.Players)
 		r.mu.Unlock()
+		
 		conn.Close()
-		log.Printf("Player disconnected from room %s. Remaining: %d", r.ID, len(r.Players))
+		log.Printf("[-] DISCONNECTED: Player left room %s. (Remaining: %d)", r.ID, remaining)
 	}()
 
 	for {

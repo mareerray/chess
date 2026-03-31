@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
@@ -29,7 +30,22 @@ func NewGameManager() *GameManager {
 func (gm *GameManager) matchmaking() {
 	for {
 		player1 := <-gm.waitingRoom
+		// Check if player1 is still connected
+		if err := player1.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(time.Second)); err != nil {
+			log.Println("Skipping disconnected player1 in matchmaking")
+			player1.Close()
+			continue
+		}
+
 		player2 := <-gm.waitingRoom
+		// Check if player2 is still connected
+		if err := player2.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(time.Second)); err != nil {
+			log.Println("Skipping disconnected player2 in matchmaking")
+			player2.Close()
+			// Put player1 back to wait for another opponent
+			go func() { gm.waitingRoom <- player1 }()
+			continue
+		}
 
 		roomID := strings.ToUpper(uuid.New().String())
 		room := NewRoom(roomID)
@@ -41,10 +57,16 @@ func (gm *GameManager) matchmaking() {
 		log.Printf("Match found! Creating room %s\n", roomID)
 
 		// Notify both players of the room ID and their colors
-		player1.WriteMessage(websocket.TextMessage, []byte("JOIN:"+roomID+":white"))
-		player2.WriteMessage(websocket.TextMessage, []byte("JOIN:"+roomID+":black"))
+		err1 := player1.WriteMessage(websocket.TextMessage, []byte("JOIN:"+roomID+":white"))
+		err2 := player2.WriteMessage(websocket.TextMessage, []byte("JOIN:"+roomID+":black"))
 
-		// Note: Don't close immediately, let the client's navigation trigger closure
+		if err1 != nil {
+			log.Printf("Failed to notify player 1: %v\n", err1)
+			// Match failed, room will be cleaned up eventually or remain empty
+		}
+		if err2 != nil {
+			log.Printf("Failed to notify player 2: %v\n", err2)
+		}
 	}
 }
 
@@ -55,7 +77,16 @@ func (gm *GameManager) HandleLobby(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	log.Println("Player entered lobby")
+	
 	gm.waitingRoom <- conn
+
+	// Wait for disconnection/joining game
+	for {
+		_, _, err := conn.ReadMessage()
+		if err != nil {
+			break
+		}
+	}
 }
 
 func (gm *GameManager) HandleCreate(w http.ResponseWriter, r *http.Request) {

@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:flutter_svg/flutter_svg.dart';
+import '../services/chess_pieces_svg.dart';
 
 class MainMenuScreen extends StatelessWidget {
   const MainMenuScreen({super.key});
@@ -84,7 +86,7 @@ class MainMenuScreen extends StatelessWidget {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xFF1A1A2E), Color(0xFF16213E)],
+            colors: [Color(0xFF262421), Color(0xFF21201D)],
           ),
         ),
         child: SafeArea(
@@ -93,13 +95,27 @@ class MainMenuScreen extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
+                  Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.05),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white10, width: 1),
+                    ),
+                    child: SvgPicture.string(
+                      PieceSvg.wP,
+                      width: 80,
+                      height: 80,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
                   const Text(
                     'CHESS',
                     style: TextStyle(
-                      fontSize: 64,
-                      fontWeight: FontWeight.bold,
+                      fontSize: 56,
+                      fontWeight: FontWeight.w900,
                       color: Colors.white,
-                      letterSpacing: 8,
+                      letterSpacing: 12,
                     ),
                   ),
                   const SizedBox(height: 48),
@@ -146,13 +162,13 @@ class _MenuButton extends StatelessWidget {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(30),
         gradient: const LinearGradient(
-          colors: [Color(0xFFE94560), Color(0xFFC0392B)],
+          colors: [Color(0xFF27AE60), Color(0xFF1E8449)],
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFFE94560).withValues(alpha: 0.3),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: const Color(0xFF27AE60).withValues(alpha: 0.2),
+            blurRadius: 15,
+            offset: const Offset(0, 6),
           ),
         ],
       ),

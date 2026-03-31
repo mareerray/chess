@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/websocket_service.dart';
@@ -11,6 +12,7 @@ class LobbyScreen extends StatefulWidget {
 
 class _LobbyScreenState extends State<LobbyScreen> {
   late WebSocketService _wsService;
+  StreamSubscription? _roomSubscription;
 
   @override
   void initState() {
@@ -18,7 +20,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
     _wsService = Provider.of<WebSocketService>(context, listen: false);
     _wsService.connectToLobby('ws://192.168.1.57:8080/rooms');
     
-    _wsService.roomStream.listen((message) {
+    _roomSubscription = _wsService.roomStream.listen((message) {
       if (!mounted) return;
       
       final parts = message.split(':');
@@ -35,33 +37,36 @@ class _LobbyScreenState extends State<LobbyScreen> {
   }
 
   @override
+  void dispose() {
+    _roomSubscription?.cancel();
+    _wsService.disconnectLobby();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF1A1A2E),
+      backgroundColor: const Color(0xFF262421),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const CircularProgressIndicator(
-              color: Color(0xFFE94560),
+            const Text(
+              "Searching for opponent...",
+              style: TextStyle(color: Colors.white70, fontSize: 18),
             ),
             const SizedBox(height: 32),
-            const Text(
-              'FINDING OPPONENT...',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                letterSpacing: 2,
-                fontWeight: FontWeight.bold,
+            const CircularProgressIndicator(color: Color(0xFFE94560)),
+            const SizedBox(height: 32),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFE94560),
+                foregroundColor: Colors.white,
               ),
-            ),
-            const SizedBox(height: 64),
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text(
-                'CANCEL',
-                style: TextStyle(color: Colors.grey),
-              ),
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              child: const Text("CANCEL"),
             ),
           ],
         ),
