@@ -36,11 +36,9 @@ class _LobbyScreenState extends State<LobbyScreen> {
     _darkSquareImg = const AssetImage('assets/board/dark_square.png');
     
     _wsService = Provider.of<WebSocketService>(context, listen: false);
-    _wsService.prepareNewSession(); // Clear any stale connections
-    _wsService.connectToLobby('wss://colory-kaci-dreadingly.ngrok-free.dev/rooms');
     
-    // Start listening immediately - the WebSocketService connection tracking handles safety
-    if (!mounted) return;
+    // We only listen for the JOIN message here. 
+    // The connection itself is managed globally by the MainMenu/WebSocketService.
     _roomSubscription = _wsService.roomStream.listen((message) {
       if (!mounted) return;
       
@@ -55,12 +53,13 @@ class _LobbyScreenState extends State<LobbyScreen> {
         );
       }
     });
+    _wsService.joinPublicQueue();
   }
 
   @override
   void dispose() {
     _roomSubscription?.cancel();
-    _wsService.disconnectLobby();
+    _wsService.leavePublicQueue();
     super.dispose();
   }
 
@@ -270,7 +269,10 @@ class _LobbyScreenState extends State<LobbyScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: () {
+                      _wsService.leavePublicQueue();
+                      Navigator.pop(context);
+                    },
                     child: const Text("CANCEL SEARCH"),
                   ),
                 ],

@@ -4,6 +4,8 @@ import 'package:web_socket_channel/status.dart' as status;
 import 'profile_service.dart';
 
 class WebSocketService {
+  static const String serverUrl = 'colory-kaci-dreadingly.ngrok-free.dev';
+
   WebSocketChannel? _lobbyChannel;
   WebSocketChannel? _gameChannel;
   String? _currentLobbyUrl;
@@ -31,7 +33,8 @@ class WebSocketService {
     return uri.replace(queryParameters: queryParams).toString();
   }
 
-  void connectToLobby(String url) {
+  void connectLobby() {
+    final url = 'wss://$serverUrl/rooms';
     final fullUrl = _appendProfileParams(url);
     if (_currentLobbyUrl == fullUrl && _lobbyChannel != null) return;
     disconnectLobby();
@@ -45,11 +48,16 @@ class WebSocketService {
         _roomController.add(message.toString());
       }
     }, onDone: () {
-      // Lobby connection closed
+      _currentLobbyUrl = null;
+      // Reconnect after delay?
+      Future.delayed(const Duration(seconds: 5), () => connectLobby());
     }, onError: (error) {
-      // Lobby error
+      _currentLobbyUrl = null;
     });
   }
+
+  // Deprecated: use connectLobby()
+  void connectToLobby(String url) => connectLobby();
 
   void disconnectLobby() {
     _lobbyChannel?.sink.close(status.normalClosure);
@@ -95,15 +103,30 @@ class WebSocketService {
   }
 
   // ------------- Lobby Actions -------------
-  void joinLobby() {}
+  void sendInvite(String targetId) {
+    if (_lobbyChannel != null) {
+      _lobbyChannel!.sink.add("INVITE:$targetId");
+    }
+  }
 
-  void invitePlayer() {}
+  void respondToInvite(String challengerId, bool accepted) {
+    if (_lobbyChannel != null) {
+      final action = accepted ? "ACCEPTED" : "DECLINED";
+      _lobbyChannel!.sink.add("INVITE_RESPONSE:$challengerId:$action");
+    }
+  }
 
-  void acceptInvite() {}
+  void joinPublicQueue() {
+    if (_lobbyChannel != null) {
+      _lobbyChannel!.sink.add("MATCHME");
+    }
+  }
 
-  void declineInvite() {}
-
-  void joinPublicQueue() {}
+  void leavePublicQueue() {
+    if (_lobbyChannel != null) {
+      _lobbyChannel!.sink.add("CANCEL_MATCHME");
+    }
+  }
 
 
   // ------------- Clean Up -------------

@@ -14,11 +14,12 @@ import (
 )
 
 type Player struct {
-	Conn   *websocket.Conn
-	Color  string
-	Name   string
-	Avatar string
-	ID     string
+	Conn      *websocket.Conn
+	Color     string
+	Name      string
+	Avatar    string
+	ID        string
+	Searching bool // Whether the player is explicitly looking for a match
 }
 
 type Room struct {

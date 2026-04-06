@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -14,14 +15,14 @@ import (
 
 type GameManager struct {
 	rooms       map[string]*Room
-	waitingRoom []*websocket.Conn
+	waitingRoom map[*websocket.Conn]*Player // Conn -> Player info in lobby
 	mu          sync.Mutex
 }
 
 func NewGameManager() *GameManager {
 	gm := &GameManager{
 		rooms:       make(map[string]*Room),
-		waitingRoom: make([]*websocket.Conn, 0),
+		waitingRoom: make(map[*websocket.Conn]*Player),
 	}
 	go gm.matchmaking()
 	return gm
@@ -29,77 +30,90 @@ func NewGameManager() *GameManager {
 
 func (gm *GameManager) matchmaking() {
 	for {
-		time.Sleep(1 * time.Second)
+		time.Sleep(2 * time.Second)
 		gm.mu.Lock()
 
-		if len(gm.waitingRoom) < 2 {
+		// Collect players who are explicitly searching
+		var candidates []*Player
+		for _, p := range gm.waitingRoom {
+			if p.Searching {
+				candidates = append(candidates, p)
+			}
+		}
+
+		if len(candidates) < 2 {
 			gm.mu.Unlock()
 			continue
 		}
 
-		// Take first two players
-		player1 := gm.waitingRoom[0]
-		player2 := gm.waitingRoom[1]
+		// Pick first two
+		p1 := candidates[0]
+		p2 := candidates[1]
+		c1, c2 := p1.Conn, p2.Conn
 
-		// Check if player1 is still connected
-		if err := player1.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(time.Second)); err != nil {
-			log.Println("Skipping disconnected player1 in matchmaking")
-			gm.waitingRoom = gm.waitingRoom[1:]
-			player1.Close()
+		// Check connectivity
+		if err := c1.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(time.Second)); err != nil {
+			delete(gm.waitingRoom, c1)
+			c1.Close()
+			gm.mu.Unlock()
+			continue
+		}
+		if err := c2.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(time.Second)); err != nil {
+			delete(gm.waitingRoom, c2)
+			c2.Close()
 			gm.mu.Unlock()
 			continue
 		}
 
-		// Check if player2 is still connected
-		if err := player2.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(time.Second)); err != nil {
-			log.Println("Skipping disconnected player2 in matchmaking")
-			gm.waitingRoom = append(gm.waitingRoom[:1], gm.waitingRoom[2:]...)
-			player2.Close()
-			gm.mu.Unlock()
-			continue
-		}
-
-		// Both are good! Remove them from waiting room
-		gm.waitingRoom = gm.waitingRoom[2:]
+		// Match found! 
+		p1.Searching = false
+		p2.Searching = false
+		delete(gm.waitingRoom, c1)
+		delete(gm.waitingRoom, c2)
 		gm.mu.Unlock()
 
-		roomID := strings.ToUpper(uuid.New().String())
+		gm.broadcastOnlinePlayers() // Notify others that these two left
+
+		roomID := strings.ToUpper(uuid.New().String()[:6])
 		room := NewRoom(roomID)
 
 		gm.mu.Lock()
 		gm.rooms[roomID] = room
 		gm.mu.Unlock()
 
-		log.Printf("Match found! Creating room %s\n", roomID)
+		log.Printf("Match found! %s vs %s in room %s\n", p1.Name, p2.Name, roomID)
 
-		// Notify both players of the room ID and their colors
-		err1 := player1.WriteMessage(websocket.TextMessage, []byte("JOIN:"+roomID+":white"))
-		err2 := player2.WriteMessage(websocket.TextMessage, []byte("JOIN:"+roomID+":black"))
+		c1.WriteMessage(websocket.TextMessage, []byte("JOIN:"+roomID+":white"))
+		c2.WriteMessage(websocket.TextMessage, []byte("JOIN:"+roomID+":black"))
+	}
+}
 
-		if err1 != nil || err2 != nil {
-			if err1 != nil {
-				log.Printf("Failed to notify player 1: %v\n", err1)
-			} else {
-				// Player 1 successfully notified but Player 2 failed. Put P1 back.
-				gm.mu.Lock()
-				gm.waitingRoom = append([]*websocket.Conn{player1}, gm.waitingRoom...)
-				gm.mu.Unlock()
-			}
-			
-			if err2 != nil {
-				log.Printf("Failed to notify player 2: %v\n", err2)
-			} else {
-				// Player 2 successfully notified but Player 1 failed. Put P2 back.
-				gm.mu.Lock()
-				gm.waitingRoom = append([]*websocket.Conn{player2}, gm.waitingRoom...)
-				gm.mu.Unlock()
-			}
-			// Cancel this match
-			gm.mu.Lock()
-			delete(gm.rooms, roomID)
-			gm.mu.Unlock()
-			continue
-		}
+func (gm *GameManager) broadcastOnlinePlayers() {
+	gm.mu.Lock()
+	defer gm.mu.Unlock()
+
+	type PlayerInfo struct {
+		Name   string `json:"name"`
+		Avatar string `json:"avatar"`
+		ID     string `json:"id"`
+		Search bool   `json:"search"` // Let clients know if they can invite or if someone is busy searching
+	}
+
+	var players []PlayerInfo
+	for _, p := range gm.waitingRoom {
+		players = append(players, PlayerInfo{
+			Name:   p.Name,
+			Avatar: p.Avatar,
+			ID:     p.ID,
+			Search: p.Searching,
+		})
+	}
+
+	data, _ := json.Marshal(players)
+	msg := "ONLINE_PLAYERS:" + string(data)
+
+	for conn := range gm.waitingRoom {
+		conn.WriteMessage(websocket.TextMessage, []byte(msg))
 	}
 }
 
@@ -109,30 +123,131 @@ func (gm *GameManager) HandleLobby(w http.ResponseWriter, r *http.Request) {
 		log.Println("Upgrade error:", err)
 		return
 	}
-	
+
+	name := r.URL.Query().Get("name")
+	avatar := r.URL.Query().Get("avatar")
+	playerID := r.URL.Query().Get("id")
+
+	if name == "" {
+		name = "Anonymous"
+	}
+
+	player := &Player{
+		Conn:      conn,
+		Name:      name,
+		Avatar:    avatar,
+		ID:        playerID,
+		Searching: false, // Default is not searching
+	}
+
 	gm.mu.Lock()
-	gm.waitingRoom = append(gm.waitingRoom, conn)
+	gm.waitingRoom[conn] = player
 	gm.mu.Unlock()
-	log.Println("Player entered lobby")
-	
+
+	log.Printf("Player %s entered lobby", name)
+	gm.broadcastOnlinePlayers()
+
 	defer func() {
 		gm.mu.Lock()
-		log.Println("Player left lobby (cleaning queue)")
-		for i, c := range gm.waitingRoom {
-			if c == conn {
-				gm.waitingRoom = append(gm.waitingRoom[:i], gm.waitingRoom[i+1:]...)
+		delete(gm.waitingRoom, conn)
+		gm.mu.Unlock()
+		conn.Close()
+		log.Printf("Player %s left lobby", name)
+		gm.broadcastOnlinePlayers()
+	}()
+
+	// Handle lobby messages (like invites)
+	for {
+		_, msg, err := conn.ReadMessage()
+		if err != nil {
+			break
+		}
+		gm.handleLobbyMessage(player, string(msg))
+	}
+}
+
+func (gm *GameManager) handleLobbyMessage(sender *Player, msg string) {
+	parts := strings.Split(msg, ":")
+	if len(parts) < 1 {
+		return
+	}
+
+	command := parts[0]
+
+	switch command {
+	case "MATCHME":
+		log.Printf("Player %s joined matchmaking queue", sender.Name)
+		sender.Searching = true
+		gm.broadcastOnlinePlayers()
+
+	case "CANCEL_MATCHME":
+		log.Printf("Player %s left matchmaking queue", sender.Name)
+		sender.Searching = false
+		gm.broadcastOnlinePlayers()
+
+	case "INVITE":
+		if len(parts) < 2 { return }
+		targetID := parts[1]
+		gm.mu.Lock()
+		var targetPlayer *Player
+		for _, p := range gm.waitingRoom {
+			if p.ID == targetID {
+				targetPlayer = p
 				break
 			}
 		}
 		gm.mu.Unlock()
-		conn.Close()
-	}()
 
-	// Wait for disconnection/joining game
-	for {
-		_, _, err := conn.ReadMessage()
-		if err != nil {
-			break
+		if targetPlayer != nil {
+			log.Printf("Relaying invite from %s to %s", sender.Name, targetPlayer.Name)
+			inviteMsg := fmt.Sprintf("INVITE_FROM:%s:%s:%s", sender.ID, sender.Name, sender.Avatar)
+			targetPlayer.Conn.WriteMessage(websocket.TextMessage, []byte(inviteMsg))
+		}
+
+	case "INVITE_RESPONSE":
+		if len(parts) < 3 {
+			return
+		}
+		challengerID := parts[1]
+		response := parts[2] // "ACCEPTED" or "DECLINED"
+
+		gm.mu.Lock()
+		var challenger *Player
+		for _, p := range gm.waitingRoom {
+			if p.ID == challengerID {
+				challenger = p
+				break
+			}
+		}
+		gm.mu.Unlock()
+
+		if challenger == nil {
+			return
+		}
+
+		if response == "ACCEPTED" {
+			log.Printf("Invite accepted! %s vs %s", challenger.Name, sender.Name)
+			
+			// Create room
+			roomID := strings.ToUpper(uuid.New().String()[:6]) + "_INV"
+			room := NewRoom(roomID)
+			
+			gm.mu.Lock()
+			gm.rooms[roomID] = room
+			// Remove both from lobby and stop searching
+			sender.Searching = false
+			challenger.Searching = false
+			delete(gm.waitingRoom, challenger.Conn)
+			delete(gm.waitingRoom, sender.Conn)
+			gm.mu.Unlock()
+
+			gm.broadcastOnlinePlayers()
+
+			challenger.Conn.WriteMessage(websocket.TextMessage, []byte("JOIN:"+roomID+":white"))
+			sender.Conn.WriteMessage(websocket.TextMessage, []byte("JOIN:"+roomID+":black"))
+		} else {
+			log.Printf("Invite declined by %s", sender.Name)
+			challenger.Conn.WriteMessage(websocket.TextMessage, []byte("INVITE_DECLINED:"+sender.Name))
 		}
 	}
 }
