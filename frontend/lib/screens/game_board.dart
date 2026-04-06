@@ -88,14 +88,14 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
 
   void _setupListeners() {
     _gameSubscription = _wsService.gameStream.listen((message) {
-      debugPrint('📩 GAME MSG: $message');
+      // debugPrint('📩 GAME MSG: $message');
       if (mounted) {
         setState(() {
           if (message == "white" || message == "black") {
             _myColor = message;
-            print('[GAME] Assigned Color: $_myColor');
+            // print('[GAME] Assigned Color: $_myColor');
           } else if (message.startsWith("PLAYER_INFO:")) {
-            print('[GAME] Player Info Received: $message');
+            // print('[GAME] Player Info Received: $message');
             final parts = message.split(":");
             if (parts.length >= 5) {
               final info = {
@@ -111,7 +111,7 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
               }
             }
           } else if (message.startsWith("BOARD:")) {
-            print('[GAME] Board Received: $message');
+            // print('[GAME] Board Received: $message');
             final parts = message.split(":");
             final fen = parts[1];
             _chess.load(fen);
@@ -550,10 +550,19 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
       backgroundColor: const Color(0xFF262421),
       appBar: AppBar(
         title: Text(
-          (_roomID != null && _roomID!.isNotEmpty) 
-            ? "Chess [$_roomID]" 
-            : "Chess"
+          _roomID == null || _roomID!.isEmpty
+            ? "Chess"
+            : _roomID!.endsWith('_INV')
+              ? "Private: ${_roomID!}"
+              : _roomID!.endsWith('_BOT')
+                ? "Chess"
+                : "Public: $_roomID"
         ),
+        // title: Text(
+        //   (_roomID != null && _roomID!.isNotEmpty) 
+        //     ? "Chess [$_roomID]" 
+        //     : "Chess"
+        // ),
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [

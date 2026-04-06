@@ -74,7 +74,6 @@ class WebSocketService {
 
   void connectToGame(String url) {
     final fullUrl = _appendProfileParams(url);
-    print('🎮 connectToGame fullUrl: $fullUrl');
 
     // Already connected to this exact room — do nothing
     if (_currentGameUrl == fullUrl && _gameChannel != null) return;
@@ -134,8 +133,11 @@ class WebSocketService {
   }
 
   void joinPublicQueue() {
+    print('🟢 joinPublicQueue called — channel: $_lobbyChannel');
     if (_lobbyChannel != null) {
       _lobbyChannel!.sink.add("MATCHME");
+    } else {
+      print('🔴 MATCHME not sent — no lobby channel!');
     }
   }
 

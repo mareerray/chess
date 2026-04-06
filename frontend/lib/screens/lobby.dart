@@ -24,7 +24,8 @@ class _LobbyScreenState extends State<LobbyScreen> {
   List<Map<String, dynamic>> _possibleMovesData = [];
   String? _lastMoveFrom;
   String? _lastMoveTo;
-  
+  bool _navigating = false;
+
   late ImageProvider _lightSquareImg;
   late ImageProvider _darkSquareImg;
 
@@ -39,20 +40,26 @@ class _LobbyScreenState extends State<LobbyScreen> {
     
     _roomSubscription = _wsService.roomStream.listen((message) {
       if (!mounted) return;
+      debugPrint('🟡 LOBBY MSG: $message');
       
       final parts = message.split(':');
       if (parts.length >= 3 && parts[0] == 'JOIN') {
-        final roomID = parts[1];
-        final assignedColor = parts[2];
+        if (_navigating) return;
+        _navigating = true;
         Navigator.pushReplacementNamed(
           context, 
           '/game', 
-          arguments: '$roomID:$assignedColor',
+          arguments: '${parts[1]}:${parts[2]}',
         );
       }
     });
 
-    _wsService.joinPublicQueue();
+    // Wait for lobby connection to be established before joining queue
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (mounted) _wsService.joinPublicQueue();
+    });
+
+    // _wsService.joinPublicQueue();
   }
 
   @override

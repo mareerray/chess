@@ -48,9 +48,14 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
       } else if (message.startsWith('JOIN:')) {
         final parts = message.split(':');
         if (parts.length >= 3) {
-          Navigator.pushNamed(context, '/game', arguments: '${parts[1]}:${parts[2]}');
+          final roomID = parts[1];
+          final color = parts[2];
+          // Only handle invite rooms here — public match is handled by LobbyScreen
+          if (roomID.endsWith('_INV')) {
+            Navigator.pushNamed(context, '/game', arguments: '$roomID:$color');
+          }
         }
-      }
+      }    
     });
   }
 
