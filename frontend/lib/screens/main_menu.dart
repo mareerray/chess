@@ -20,7 +20,6 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   late WebSocketService _wsService;
   StreamSubscription? _roomSubscription;
   List<dynamic> _onlinePlayers = [];
-  int numOfOponents = 0;
 
   @override
   void initState() {
@@ -35,7 +34,6 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
         final jsonStr = message.substring('ONLINE_PLAYERS:'.length);
         setState(() {
           _onlinePlayers = json.decode(jsonStr);
-          numOfOponents = _onlinePlayers.length - 1;
         });
       } else if (message.startsWith('INVITE_FROM:')) {
         final parts = message.split(':');
@@ -60,6 +58,10 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   void dispose() {
     _roomSubscription?.cancel();
     super.dispose();
+  }
+
+  int get numOfOpponents {
+    return _onlinePlayers.where((player) => player['id'] != _profileService.deviceId).length;
   }
 
   void _showInviteDialog(String challengerId, String challengerName, String challengerAvatar) {
@@ -130,7 +132,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                     decoration: BoxDecoration(color: Colors.green.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(12)),
-                    child: Text('$numOfOponents', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+                    child: Text('$numOfOpponents', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
                   ),
                 ],
               ),
@@ -286,7 +288,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                     padding: const EdgeInsets.all(6),
                     decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle),
                     child: Text(
-                      '${_onlinePlayers.length}',
+                      '$numOfOpponents',
                       style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
                     ),
                   ),
