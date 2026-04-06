@@ -43,30 +43,23 @@ class WebSocketService {
     _lobbyConnectionId++;
     final thisId = _lobbyConnectionId;
     
-    print('[WS] Connecting to Lobby: $fullUrl');
-    
     try {
       _lobbyChannel = WebSocketChannel.connect(Uri.parse(fullUrl));
       _lobbyChannel!.stream.listen((message) {
         if (thisId == _lobbyConnectionId) {
-          if (message.toString().startsWith('ONLINE_PLAYERS:')) {
-             // Only log this once or rarely to avoid spam
-             // print('[WS] Received online players update'); 
-          }
           _roomController.add(message.toString());
         }
       }, onDone: () {
-        print('[WS] Lobby Connection Closed (ID: $thisId)');
         _currentLobbyUrl = null;
         if (thisId == _lobbyConnectionId) {
           Future.delayed(const Duration(seconds: 5), () => connectLobby());
         }
       }, onError: (error) {
-        print('[WS] Lobby Connection Error (ID: $thisId): $error');
         _currentLobbyUrl = null;
+        _roomController.add('[WS_ERROR]$error');
       });
     } catch (e) {
-      print('[WS] Failed to initiate lobby connection: $e');
+      _roomController.add('[WS_ERROR]$e');
     }
   }
 
