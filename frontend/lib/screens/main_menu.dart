@@ -20,6 +20,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   late WebSocketService _wsService;
   StreamSubscription? _roomSubscription;
   List<dynamic> _onlinePlayers = [];
+  int numOfOponents = 0;
 
   @override
   void initState() {
@@ -34,6 +35,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
         final jsonStr = message.substring('ONLINE_PLAYERS:'.length);
         setState(() {
           _onlinePlayers = json.decode(jsonStr);
+          numOfOponents = _onlinePlayers.length - 1;
         });
       } else if (message.startsWith('INVITE_FROM:')) {
         final parts = message.split(':');
@@ -98,7 +100,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
               backgroundColor: const Color(0xFFE94560),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            child: const Text('ACCEPT'),
+            child: const Text('ACCEPT', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -128,7 +130,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                     decoration: BoxDecoration(color: Colors.green.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(12)),
-                    child: Text('${_onlinePlayers.length}', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+                    child: Text('$numOfOponents', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
                   ),
                 ],
               ),
@@ -164,7 +166,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                                   );
                                 },
                                 style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE94560), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-                                child: const Text('INVITE'),
+                                child: const Text('INVITE', style: TextStyle(color: Colors.white)),
                               ),
                             ],
                           ),

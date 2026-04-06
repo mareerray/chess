@@ -190,9 +190,6 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
               // else: game was in progress → GAMEOVER will arrive next, do nothing here
             });
 
-            // ScaffoldMessenger.of(context).showSnackBar(
-            //   const SnackBar(content: Text("Your opponent has left the game.")),
-            // );
           } else if (message.startsWith("TURN:")) {
             _turn = message.substring(5);
           } else if (message.startsWith("GAMEOVER:")) {
