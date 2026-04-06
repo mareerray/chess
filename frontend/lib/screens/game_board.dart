@@ -66,7 +66,13 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
 
     _wsService = Provider.of<WebSocketService>(context, listen: false);
     _setupListeners();
-    String wsUrl = 'wss://colory-kaci-dreadingly.ngrok-free.dev/rooms/$_roomID';
+
+    final profile = ProfileService();
+    final name = Uri.encodeComponent(profile.nickname);       // encode for URL safety
+    final avatar = profile.avatarIndex.toString();
+
+    String wsUrl = 'wss://colory-kaci-dreadingly.ngrok-free.dev/rooms/$_roomID''?name=$name&avatar=$avatar';
+
     if (_assignedColor != null) {
       wsUrl += '?color=$_assignedColor';
     }
@@ -323,175 +329,6 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
       ),
     );
   }
-
-  // void _showGameOver(String reason) {
-  //   bool isVictory = false;
-  //   bool isDraw = reason.contains("1/2-1/2");
-    
-  //   if (!isDraw) {
-  //     if (reason.contains("1-0")) {
-  //       isVictory = _myColor == "white";
-  //     } else if (reason.contains("0-1")) {
-  //       isVictory = _myColor == "black";
-  //     }
-  //   }
-
-  //   final String title = isDraw ? "Draw" : (isVictory ? "Victory!" : "You lost");
-  //   final IconData icon = isDraw 
-  //       ? Icons.handshake_outlined 
-  //       : (isVictory ? Icons.emoji_events : Icons.sentiment_very_dissatisfied);
-  //   final Color mainColor = isDraw 
-  //       ? const Color(0xFFF1C40F) // Yellow for draw
-  //       : (isVictory ? const Color(0xFF27AE60) : const Color(0xFFE94560)); // Green for win, Pink/Red for loss
-
-  //   // Friendly reason text
-  //   String friendlyReason = "";
-  //   String method = reason.split(" by ").last;
-    
-  //   if (isDraw) {
-  //     friendlyReason = "The game ended in a draw by $method";
-  //   } else if (isVictory) {
-  //     String opponentColor = _myColor == "white" ? "Black" : "White";
-  //     friendlyReason = "You defeated $opponentColor by $method";
-  //   } else {
-  //     String winnerColor = reason.contains("1-0") ? "White" : "Black";
-  //     friendlyReason = "$winnerColor Wins by $method";
-  //   }
-
-  //   showDialog(
-  //     context: context,
-  //     barrierDismissible: false,
-  //     builder: (context) => StatefulBuilder(
-  //       builder: (context, dialogSetState) {
-  //         _dialogSetState = dialogSetState;
-  //         return BackdropFilter(
-  //           filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-  //           child: Dialog(
-  //             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-  //             backgroundColor: const Color(0xFF262421).withValues(alpha: 0.95),
-  //             child: Padding(
-  //               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-  //               child: Column(
-  //                 mainAxisSize: MainAxisSize.min,
-  //                 children: [
-  //                   Container(
-  //                     padding: const EdgeInsets.all(16),
-  //                     decoration: BoxDecoration(
-  //                       color: mainColor.withValues(alpha: 0.1),
-  //                       shape: BoxShape.circle,
-  //                     ),
-  //                     child: Icon(
-  //                       icon, 
-  //                       size: 48, 
-  //                       color: mainColor,
-  //                     ),
-  //                   ),
-  //                   const SizedBox(height: 24),
-  //                   Text(
-  //                     title, 
-  //                     style: TextStyle(
-  //                       fontSize: 28, 
-  //                       fontWeight: FontWeight.bold, 
-  //                       color: mainColor,
-  //                       letterSpacing: 0.5,
-  //                     ),
-  //                   ),
-  //                   const SizedBox(height: 12),
-  //                   Text(
-  //                     friendlyReason, 
-  //                     textAlign: TextAlign.center, 
-  //                     style: const TextStyle(
-  //                       fontSize: 16, 
-  //                       color: Colors.white70,
-  //                       height: 1.4,
-  //                     )
-  //                   ),
-  //                   const SizedBox(height: 32),
-  //                   SizedBox(
-  //                     width: double.infinity,
-  //                     height: 52,
-  //                     child: ElevatedButton(
-  //                       style: ElevatedButton.styleFrom(
-  //                         backgroundColor: _opponentLeft 
-  //                             ? Colors.white10 
-  //                             : const Color(0xFFE94560),
-  //                         foregroundColor: _opponentLeft 
-  //                             ? Colors.white30 
-  //                             : Colors.white,
-  //                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-  //                         elevation: _opponentLeft ? 0 : 8,
-  //                         shadowColor: const Color(0xFFE94560).withValues(alpha: 0.4),
-  //                       ),
-  //                       onPressed: _opponentLeft ? null : () {
-  //                         Navigator.of(context).pop();
-  //                         _dialogSetState = null;
-  //                         _wsService.sendMove("RESTART");
-  //                       },
-  //                       child: Text(
-  //                         _opponentLeft ? "OPPONENT LEFT" : "REMATCH",
-  //                         style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1.1),
-  //                       ),
-  //                     ),
-  //                   ),
-  //                   const SizedBox(height: 12),
-  //                   SizedBox(
-  //                     width: double.infinity,
-  //                     height: 52,
-  //                     child: OutlinedButton(
-  //                       style: OutlinedButton.styleFrom(
-  //                         side: const BorderSide(color: Color(0xFF27AE60), width: 1.5),
-  //                         foregroundColor: const Color(0xFF27AE60),
-  //                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-  //                         textStyle: const TextStyle(
-  //                           fontSize: 16, 
-  //                           fontWeight: FontWeight.bold,
-  //                           letterSpacing: 1.1,
-  //                         ),
-  //                       ),
-  //                       onPressed: () {
-  //                         Navigator.of(context).push(
-  //                           MaterialPageRoute(
-  //                             builder: (context) => AnalysisScreen(
-  //                               fenHistory: _fenHistory,
-  //                               moveHistory: _moveHistory,
-  //                               myColor: _myColor,
-  //                             ),
-  //                           ),
-  //                         );
-  //                       },
-  //                       child: const Text("ANALYZE"),
-  //                     ),
-  //                   ),
-  //                   const SizedBox(height: 12),
-  //                   SizedBox(
-  //                     width: double.infinity,
-  //                     height: 52,
-  //                     child: OutlinedButton(
-  //                       style: OutlinedButton.styleFrom(
-  //                         side: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
-  //                         foregroundColor: Colors.white70,
-  //                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-  //                         textStyle: const TextStyle(
-  //                           fontSize: 16, 
-  //                           fontWeight: FontWeight.w600,
-  //                         ),
-  //                       ),
-  //                       onPressed: () {
-  //                         _dialogSetState = null;
-  //                         Navigator.of(context).popUntil((route) => route.isFirst);
-  //                       },
-  //                       child: const Text("MAIN MENU"),
-  //                     ),
-  //                   ),
-  //                 ],
-  //               ),
-  //             ),
-  //           ),
-  //         );
-  //       }
-  //     ),
-  //   );
-  // }
 
   void _showGameOver(String reason) {
   bool isVictory = false;
@@ -750,8 +587,25 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
     final bool isMyTurn = _turn == color;
     
     final player = (color == 'white') ? _whitePlayer : _blackPlayer;
-    final String label = player?['name'] ?? (isMe ? "You" : "Opponent");
+
+    final profile = ProfileService();
+    final String label = player?['name'] ?? (isMe ? profile.nickname : "Opponent");
+
+    int? avatarIndex;
     final String? avatarIndexStr = player?['avatar'];
+    if (avatarIndexStr != null) {
+      avatarIndex = int.tryParse(avatarIndexStr); // tryParse won't crash on bad input
+    } else if (isMe) {
+      avatarIndex = profile.avatarIndex; // show our own avatar while waiting
+    }
+    
+    // Validate the index is in range
+    final avatars = ProfileService.getAvailableAvatars();
+    final bool hasValidAvatar = avatarIndex != null 
+        && avatarIndex >= 0 
+        && avatarIndex < avatars.length;
+
+
     
     // Calculate captured pieces
     Map<chess_lib.PieceType, int> captured = _getCapturedPieces(color == "white" ? chess_lib.Color.BLACK : chess_lib.Color.WHITE);
@@ -773,10 +627,13 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
               border: Border.all(color: isMe ? const Color(0xFFE94560) : Colors.white10),
             ),
             padding: const EdgeInsets.all(4),
-            child: (avatarIndexStr != null) 
-              ? SvgPicture.string(ProfileService.getAvailableAvatars()[int.parse(avatarIndexStr)])
-              : Icon(Icons.person, color: isMe ? const Color(0xFFE94560) : Colors.white70),
-          ),
+            child: hasValidAvatar
+              ? SvgPicture.string(avatars[avatarIndex!])
+              : Icon(
+                  Icons.person, 
+                  color: isMe ? const Color(0xFFE94560) : Colors.white70,
+                ),          
+              ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
