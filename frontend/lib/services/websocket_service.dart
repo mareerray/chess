@@ -74,8 +74,14 @@ class WebSocketService {
 
   void connectToGame(String url) {
     final fullUrl = _appendProfileParams(url);
+    print('🎮 connectToGame fullUrl: $fullUrl');
+
+    // Already connected to this exact room — do nothing
     if (_currentGameUrl == fullUrl && _gameChannel != null) return;
+
+    // Different room — disconnect old one first
     disconnectGame();
+
     _currentGameUrl = fullUrl;
     _gameConnectionId++;
     final thisId = _gameConnectionId;
@@ -87,8 +93,12 @@ class WebSocketService {
       }
     }, onDone: () {
       // Game connection closed
+      if (thisId == _gameConnectionId) {
+        _currentGameUrl = null;
+      }
     }, onError: (error) {
       // Game error
+      _gameController.add('[WS_ERROR]$error');
     });
   }
 

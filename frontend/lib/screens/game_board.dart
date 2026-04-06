@@ -31,9 +31,9 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
   List<String> _fenHistory = []; // Track FENs for analysis
   String _moveHistory = "";
   String? _assignedColor;
-  bool _isInitialized = false;
   bool _opponentLeft = false;
   StateSetter? _dialogSetState;  
+  bool _connected = false;
   
   // High-fidelity board colors (Modern Wood)
   late ImageProvider _lightSquareImg;
@@ -49,8 +49,9 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (_isInitialized) return;
-    _isInitialized = true;
+
+    if (_connected) return; // ← only connect once
+    _connected = true;
     
     final args = ModalRoute.of(context)!.settings.arguments as String;
     
@@ -70,8 +71,9 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
     final profile = ProfileService();
     final name = Uri.encodeComponent(profile.nickname);
     final avatar = profile.avatarIndex.toString();
+    final id = profile.deviceId;
 
-    String wsUrl = 'wss://${WebSocketService.serverUrl}/rooms/$_roomID?name=$name&avatar=$avatar';
+    String wsUrl = 'wss://${WebSocketService.serverUrl}/rooms/$_roomID?name=$name&avatar=$avatar&id=$id';
 
     if (_assignedColor != null) {
       wsUrl += '&color=$_assignedColor';
@@ -86,6 +88,7 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
 
   void _setupListeners() {
     _gameSubscription = _wsService.gameStream.listen((message) {
+      debugPrint('📩 GAME MSG: $message');
       if (mounted) {
         setState(() {
           if (message == "white" || message == "black") {
@@ -547,7 +550,7 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
       backgroundColor: const Color(0xFF262421),
       appBar: AppBar(
         title: Text(
-          (_roomID != null && _roomID!.length == 6) 
+          (_roomID != null && _roomID!.isNotEmpty) 
             ? "Chess [$_roomID]" 
             : "Chess"
         ),
@@ -588,9 +591,16 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
     final player = (color == 'white') ? _whitePlayer : _blackPlayer;
 
     final profile = ProfileService();
-    final String label = player?['name'] ?? (isMe ? profile.nickname : "Opponent");
 
-    
+    // Practice mode: player is white, bot is black
+    final bool isBotOpponent =
+        _myColor == 'white' &&
+        color == 'black' &&
+        player == null;
+
+    final String label = isBotOpponent
+        ? 'Bot'
+        : (player?['name'] ?? (isMe ? profile.nickname : 'Opponent'));
 
     int? avatarIndex;
     final String? avatarIndexStr = player?['avatar'];
@@ -602,14 +612,14 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
     
     // Validate the index is in range
     final avatars = ProfileService.getAvailableAvatars();
-    final bool hasValidAvatar = avatarIndex != null 
+    final bool hasValidAvatar = 
+        avatarIndex != null 
         && avatarIndex >= 0 
         && avatarIndex < avatars.length;
-
-
     
     // Calculate captured pieces
-    Map<chess_lib.PieceType, int> captured = _getCapturedPieces(color == "white" ? chess_lib.Color.BLACK : chess_lib.Color.WHITE);
+    Map<chess_lib.PieceType, int> captured = _getCapturedPieces(
+      color == "white" ? chess_lib.Color.BLACK : chess_lib.Color.WHITE);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -623,18 +633,25 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: isMe ? const Color(0xFFE94560).withValues(alpha: 0.1) : Colors.white.withValues(alpha: 0.05),
+              color: isMe 
+                ? const Color(0xFFE94560).withValues(alpha: 0.1) 
+                : Colors.white.withValues(alpha: 0.05),
               shape: BoxShape.circle,
               border: Border.all(color: isMe ? const Color(0xFFE94560) : Colors.white10),
             ),
             padding: const EdgeInsets.all(4),
-            child: hasValidAvatar
-              ? SvgPicture.string(avatars[avatarIndex])
-              : Icon(
-                  Icons.person, 
-                  color: isMe ? const Color(0xFFE94560) : Colors.white70,
-                ),          
-              ),
+            child: isBotOpponent
+              ? const Icon(
+                Icons.smart_toy,
+                color: Colors.white70,
+                )
+              : hasValidAvatar
+                ? SvgPicture.string(avatars[avatarIndex])
+                : Icon(
+                    Icons.person, 
+                    color: isMe ? const Color(0xFFE94560) : Colors.white70,
+                  ),          
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
