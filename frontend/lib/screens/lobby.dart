@@ -37,8 +37,6 @@ class _LobbyScreenState extends State<LobbyScreen> {
     
     _wsService = Provider.of<WebSocketService>(context, listen: false);
     
-    // We only listen for the JOIN message here. 
-    // The connection itself is managed globally by the MainMenu/WebSocketService.
     _roomSubscription = _wsService.roomStream.listen((message) {
       if (!mounted) return;
       
@@ -53,6 +51,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
         );
       }
     });
+
     _wsService.joinPublicQueue();
   }
 
