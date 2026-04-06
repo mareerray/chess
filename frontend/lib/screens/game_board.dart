@@ -588,6 +588,8 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
     final profile = ProfileService();
     final String label = player?['name'] ?? (isMe ? profile.nickname : "Opponent");
 
+    
+
     int? avatarIndex;
     final String? avatarIndexStr = player?['avatar'];
     if (avatarIndexStr != null) {
@@ -625,7 +627,7 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
             ),
             padding: const EdgeInsets.all(4),
             child: hasValidAvatar
-              ? SvgPicture.string(avatars[avatarIndex!])
+              ? SvgPicture.string(avatars[avatarIndex])
               : Icon(
                   Icons.person, 
                   color: isMe ? const Color(0xFFE94560) : Colors.white70,

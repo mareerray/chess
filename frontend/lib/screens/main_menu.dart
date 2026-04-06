@@ -359,7 +359,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                       ),
                       const SizedBox(height: 16),
                       _MenuButton(
-                        title: 'PLAY BOT',
+                        title: 'PLAY WITH BOT',
                         onPressed: () => _startPractice(context),
                       ),
                     ],
