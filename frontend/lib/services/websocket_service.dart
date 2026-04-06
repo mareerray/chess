@@ -100,7 +100,7 @@ class WebSocketService {
 
   void sendMove(String move) {
     if (_gameChannel != null) {
-      _gameChannel!.sink.add(move);
+      _gameChannel!.sink.add("MOVE:$move");
     }
   }
 

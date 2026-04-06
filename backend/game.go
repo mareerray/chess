@@ -6,6 +6,7 @@ import (
 	"log"
 	"math/rand"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -64,19 +65,16 @@ func (r *Room) Join(conn *websocket.Conn, requestedColor, name, avatar, id strin
 	if color == "" {
 		if len(r.Players) == 0 {
 			color = "white"
-		} else if len(r.Players) == 1 {
-			// Take what's left
+		} else {
+			// Second player: MUST take the other color
 			for _, p := range r.Players {
 				if p.Color == "white" {
 					color = "black"
 				} else {
 					color = "white"
 				}
+				break // only one existing player
 			}
-		} else {
-			conn.WriteMessage(websocket.TextMessage, []byte("Room full"))
-			conn.Close()
-			return
 		}
 	}
 
@@ -122,6 +120,20 @@ func (r *Room) sendMessage(conn *websocket.Conn, msg string) {
     conn.WriteMessage(websocket.TextMessage, []byte(msg))
 }
 
+// Internal version that assumes room lock IS NOT held, but handles its own connection-level locking
+func (r *Room) broadcastSafe(msg string) {
+	r.mu.Lock()
+	var conns []*websocket.Conn
+	for conn := range r.Players {
+		conns = append(conns, conn)
+	}
+	r.mu.Unlock()
+
+	for _, conn := range conns {
+		r.sendMessage(conn, msg)
+	}
+}
+
 func (r *Room) broadcastColors() {
 	for conn, p := range r.Players {
 		// Send own color
@@ -149,11 +161,17 @@ func (r *Room) broadcastBoard(lastMove string) {
 		if i%2 == 0 {
 			history += fmt.Sprintf("%d. ", (i/2)+1)
 		}
-		// Use SAN notation for history
 		history += chess.AlgebraicNotation{}.Encode(r.Game.Positions()[i], moves[i]) + " "
 	}
 
-	for conn := range r.Players {
+    r.mu.Lock()
+    var conns []*websocket.Conn
+    for c := range r.Players {
+        conns = append(conns, c)
+    }
+    r.mu.Unlock()
+
+	for _, conn := range conns {
 		r.sendMessage(conn, msg)
 		if history != "" {
 			r.sendMessage(conn, "MOVES:"+history)
@@ -215,24 +233,32 @@ func (r *Room) handlePlayer(conn *websocket.Conn) {
 	}
 }
 
-func (r *Room) processMove(conn *websocket.Conn, moveStr string) {
-	if moveStr == "RESTART" {
+func (r *Room) processMove(conn *websocket.Conn, message string) {
+	if message == "RESTART" {
 		r.Restart()
 		return
 	}
 
+    moveStr := message
+    if strings.HasPrefix(moveStr, "MOVE:") {
+        moveStr = strings.TrimPrefix(moveStr, "MOVE:")
+    }
+
 	r.mu.Lock()
+    log.Printf("[SERVER] Processing move: %s (Turn: %s, MyColor: %s)", moveStr, r.Game.Position().Turn(), r.Players[conn].Color)
 
 	player := r.Players[conn]
 	if player == nil {
+        log.Printf("[SERVER] Error: Player not found for connection")
 		r.mu.Unlock()
 		return
 	}
 	color := player.Color
 	if (color == "white" && r.Game.Position().Turn() != chess.White) ||
 		(color == "black" && r.Game.Position().Turn() != chess.Black) {
-		r.mu.Unlock() // Unlock before sending message to avoid deadlock
+		r.mu.Unlock() 
 		r.sendMessage(conn, "ERROR:Not your turn")
+        log.Printf("[SERVER] Error: Not your turn (Color: %s, Turn: %s)", color, r.Game.Position().Turn())
 		return
 	}
 
@@ -241,6 +267,7 @@ func (r *Room) processMove(conn *websocket.Conn, moveStr string) {
 	if err != nil {
 		r.mu.Unlock()
 		r.sendMessage(conn, "ERROR:Invalid move: "+err.Error())
+        log.Printf("[SERVER] Error: UCI Decode Failed: %v (msg: %s)", err, moveStr)
 		return
 	}
 
@@ -248,11 +275,13 @@ func (r *Room) processMove(conn *websocket.Conn, moveStr string) {
 	if err != nil {
 		r.mu.Unlock()
 		r.sendMessage(conn, "ERROR:Move execution failed: "+err.Error())
+        log.Printf("[SERVER] Error: Move Execution Failed: %v", err)
 		return
 	}
 
+    log.Printf("[SERVER] Move successful: %s", moveStr)
 	gameOver := r.Game.Outcome() != chess.NoOutcome
-    r.mu.Unlock()  // ← unlock before broadcasting
+    r.mu.Unlock()
 
 	// Move successful, broadcast new state
 	r.broadcastBoard(moveStr)
@@ -271,7 +300,15 @@ func (r *Room) notifyTurn() {
 	if r.Game.Position().Turn() == chess.Black {
 		turn = "black"
 	}
-	for conn := range r.Players {
+
+    r.mu.Lock()
+    var conns []*websocket.Conn
+    for c := range r.Players {
+        conns = append(conns, c)
+    }
+    r.mu.Unlock()
+
+	for _, conn := range conns {
 		r.sendMessage(conn, "TURN:"+turn)
 	}
 

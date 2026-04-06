@@ -68,13 +68,13 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
     _setupListeners();
 
     final profile = ProfileService();
-    final name = Uri.encodeComponent(profile.nickname);       // encode for URL safety
+    final name = Uri.encodeComponent(profile.nickname);
     final avatar = profile.avatarIndex.toString();
 
-    String wsUrl = 'wss://colory-kaci-dreadingly.ngrok-free.dev/rooms/$_roomID''?name=$name&avatar=$avatar';
+    String wsUrl = 'wss://${WebSocketService.serverUrl}/rooms/$_roomID?name=$name&avatar=$avatar';
 
     if (_assignedColor != null) {
-      wsUrl += '?color=$_assignedColor';
+      wsUrl += '&color=$_assignedColor';
     }
     _wsService.connectToGame(wsUrl);
     _chess = chess_lib.Chess();
@@ -90,7 +90,9 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
         setState(() {
           if (message == "white" || message == "black") {
             _myColor = message;
+            print('[GAME] Assigned Color: $_myColor');
           } else if (message.startsWith("PLAYER_INFO:")) {
+            print('[GAME] Player Info Received: $message');
             final parts = message.split(":");
             if (parts.length >= 5) {
               final info = {
@@ -106,10 +108,11 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
               }
             }
           } else if (message.startsWith("BOARD:")) {
+            print('[GAME] Board Received: $message');
             final parts = message.split(":");
             final fen = parts[1];
             _chess.load(fen);
-            _fenHistory.add(fen); // Record position
+            _fenHistory.add(fen); 
             if (parts.length > 2) {
               final move = parts[2];
               if (move.length >= 4) {
@@ -121,77 +124,75 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
           } else if (message.startsWith("MOVES:")) {
             _moveHistory = message.substring(6);
           } else if (message == "RESTARTED") {
+            print('[GAME] Match Restarted');
             _moveHistory = "";
             _lastMoveFrom = null;
             _lastMoveTo = null;
             _selectedSquare = null;
             _possibleMoves = [];
-            _fenHistory = [_chess.fen]; // Reset history with starting position
-            _opponentLeft = false; // Reset left status
+            _fenHistory = [_chess.fen]; 
+            _opponentLeft = false; 
             HapticFeedback.vibrate();
           } else if (message.startsWith("OPPONENT_LEFT")) {
-            setState(() {
-              _opponentLeft = true;
-              if (_dialogSetState != null) {
-                _dialogSetState!(() {});
-              } else {  // ← Always show dialog - different messages for different cases
-                // Dynamic title/content based on game progress
-                final isGameInProgress = _moveHistory.isNotEmpty;
-
-                showDialog(
-                  context: context,
-                  barrierDismissible: false,
-                  builder: (context) => AlertDialog(
-                    backgroundColor: const Color(0xFF262421),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(28)
-                    ),
-                    icon: Icon(
-                      isGameInProgress ? Icons.emoji_events : Icons.exit_to_app,
-                      color: Color(0xFFE94560),
-                      size: 48,
-                    ),
-                    title: Text(
-                        isGameInProgress ? "Victory!" : "Opponent Left",                      style: TextStyle(
-                        color: Color(0xFFE94560),
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                    content: Text(
-                      isGameInProgress 
-                        ? "Your opponent resigned!" 
-                        : "Your opponent left before the game started.",
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.white70, height: 1.4),
-                    ),
-                    actions: [
-                      SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton(
-                          style: OutlinedButton.styleFrom(
-                            side: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
-                            foregroundColor: Colors.white70,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16)
-                            ),
-                          ),
-                          onPressed: () => Navigator.of(context).popUntil(
-                            (route) => route.isFirst
-                          ),
-                          child: const Text("MAIN MENU"),
-                        ),
-                      ),
-                    ],
+            print('[GAME] Opponent Left Event Received');
+            _opponentLeft = true;
+            if (_dialogSetState != null) {
+              _dialogSetState!(() {});
+            } else {  
+              final isGameInProgress = _moveHistory.isNotEmpty;
+              showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (context) => AlertDialog(
+                  backgroundColor: const Color(0xFF262421),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(28)
                   ),
-                );
-              }
-              // else: game was in progress → GAMEOVER will arrive next, do nothing here
-            });
-
+                  icon: Icon(
+                    isGameInProgress ? Icons.emoji_events : Icons.exit_to_app,
+                    color: const Color(0xFFE94560),
+                    size: 48,
+                  ),
+                  title: Text(
+                    isGameInProgress ? "Victory!" : "Opponent Left",
+                    style: const TextStyle(
+                      color: Color(0xFFE94560),
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  content: Text(
+                    isGameInProgress 
+                      ? "Your opponent resigned!" 
+                      : "Your opponent left before the game started.",
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.white70, height: 1.4),
+                  ),
+                  actions: [
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+                          foregroundColor: Colors.white70,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16)
+                          ),
+                        ),
+                        onPressed: () => Navigator.of(context).popUntil(
+                          (route) => route.isFirst
+                        ),
+                        child: const Text("MAIN MENU"),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
           } else if (message.startsWith("TURN:")) {
             _turn = message.substring(5);
+            print('[GAME] Turn Received: $_turn');
           } else if (message.startsWith("GAMEOVER:")) {
             _showGameOver(message.substring(9));
             HapticFeedback.vibrate();
@@ -275,6 +276,7 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
       }
     }
     
+    print('[GAME] Sending Move: $moveStr');
     _wsService.sendMove(moveStr);
   }
 
