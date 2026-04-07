@@ -144,7 +144,6 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
             _fenHistory = [_chess.fen]; 
             _opponentLeft = false; 
             _opponentWantsRematch = false;
-            _rematchRequestedByMe = false;
             HapticFeedback.vibrate();
             print('[DEBUG] Board Reset Successful and UI Updated');
           } else if (message == "REMATCH_REQUESTED") {
