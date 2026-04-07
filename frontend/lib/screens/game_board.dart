@@ -617,16 +617,11 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
           _roomID == null || _roomID!.isEmpty
             ? "Chess"
             : _roomID!.endsWith('_INV')
-              ? "Private: ${_roomID!}"
+              ? "Room: ${_roomID!.replaceAll('_INV', '')}"
               : _roomID!.endsWith('_BOT')
                 ? "Chess"
-                : "Public: $_roomID"
+                : "Room: $_roomID"
         ),
-        // title: Text(
-        //   (_roomID != null && _roomID!.isNotEmpty) 
-        //     ? "Chess [$_roomID]" 
-        //     : "Chess"
-        // ),
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [

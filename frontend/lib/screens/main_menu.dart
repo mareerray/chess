@@ -164,7 +164,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                                 child: SvgPicture.string(ProfileService.getAvailableAvatars()[int.parse(player['avatar'])]),
                               ),
                               const SizedBox(width: 16),
-                              Expanded(child: Text(player['name'] ?? 'Anonymous', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold))),
+                              Expanded(child: Text(player['name'] ?? 'Guest', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold))),
                               ElevatedButton(
                                 onPressed: () {
                                   _wsService.sendInvite(player['id']);

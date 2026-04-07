@@ -71,7 +71,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                 controller: _nicknameController,
                 style: const TextStyle(color: Colors.white, fontSize: 18),
                 decoration: InputDecoration(
-                  labelText: 'NICKNAME',
+                  labelText: 'ENTER NICKNAME',
                   labelStyle: const TextStyle(color: Color(0xFFE94560)),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
