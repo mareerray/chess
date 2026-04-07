@@ -224,8 +224,9 @@ func (r *Room) handlePlayer(conn *websocket.Conn) {
 			return
 		}
 
-		// Only process moves if the game has started
-		if !r.started && string(msg) != "RESTART" {
+		// Only process moves if the game has started or it's a RESTART command
+        msgStr := string(msg)
+		if !r.started && msgStr != "RESTART" && msgStr != "MOVE:RESTART" {
 			continue
 		}
 
@@ -234,12 +235,12 @@ func (r *Room) handlePlayer(conn *websocket.Conn) {
 }
 
 func (r *Room) processMove(conn *websocket.Conn, message string) {
-	if message == "RESTART" {
+	moveStr := strings.TrimPrefix(message, "MOVE:")
+
+	if moveStr == "RESTART" {
 		r.Restart()
 		return
 	}
-
-	moveStr := strings.TrimPrefix(message, "MOVE:")
 
 	r.mu.Lock()
     log.Printf("[SERVER] Processing move: %s (Turn: %s, MyColor: %s)", moveStr, r.Game.Position().Turn(), r.Players[conn].Color)

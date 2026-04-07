@@ -67,8 +67,6 @@ func (gm *GameManager) matchmaking() {
 		// Match found! 
 		p1.Searching = false
 		p2.Searching = false
-		delete(gm.waitingRoom, c1)
-		delete(gm.waitingRoom, c2)
 		gm.mu.Unlock()
 
 		gm.broadcastOnlinePlayers() // Notify others that these two left
@@ -198,10 +196,15 @@ func (gm *GameManager) handleLobbyMessage(sender *Player, msg string) {
 		gm.mu.Unlock()
 
 		if targetPlayer != nil {
-			log.Printf("Relaying invite from %s to %s", sender.Name, targetPlayer.Name)
+			log.Printf("[LOBBY] Relaying invite from %s (%s) to %s (%s)", sender.Name, sender.ID, targetPlayer.Name, targetPlayer.ID)
 			inviteMsg := fmt.Sprintf("INVITE_FROM:%s:%s:%s", sender.ID, sender.Name, sender.Avatar)
 			targetPlayer.Conn.WriteMessage(websocket.TextMessage, []byte(inviteMsg))
-		}
+		} else {
+            log.Printf("[LOBBY] Target player %s NOT FOUND. Online IDs:", targetID)
+            for _, p := range gm.waitingRoom {
+                log.Printf(" - %s (%s)", p.Name, p.ID)
+            }
+        }
 
 	case "INVITE_RESPONSE":
 		if len(parts) < 3 {
@@ -233,11 +236,9 @@ func (gm *GameManager) handleLobbyMessage(sender *Player, msg string) {
 			
 			gm.mu.Lock()
 			gm.rooms[roomID] = room
-			// Remove both from lobby and stop searching
+			// Remove both from searching queue
 			sender.Searching = false
 			challenger.Searching = false
-			delete(gm.waitingRoom, challenger.Conn)
-			delete(gm.waitingRoom, sender.Conn)
 			gm.mu.Unlock()
 
 			gm.broadcastOnlinePlayers()

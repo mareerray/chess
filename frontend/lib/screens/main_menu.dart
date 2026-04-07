@@ -29,6 +29,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
 
     _roomSubscription = _wsService.roomStream.listen((message) {
       if (!mounted) return;
+      debugPrint('🔵 MAIN_MENU LOBBY MSG: $message');
 
       if (message.startsWith('ONLINE_PLAYERS:')) {
         final jsonStr = message.substring('ONLINE_PLAYERS:'.length);
