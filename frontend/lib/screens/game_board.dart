@@ -32,6 +32,7 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
   String _moveHistory = "";
   String? _assignedColor;
   bool _opponentLeft = false;
+  bool _opponentWantsRematch = false;
   StateSetter? _dialogSetState;  
   bool _connected = false;
   
@@ -128,6 +129,13 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
             _moveHistory = message.substring(6);
           } else if (message == "RESTARTED") {
             print('[GAME] Match Restarted');
+            // If GameOver dialog or any other dialog is open, pop it using rootNavigator for reliability
+            if (_dialogSetState != null) {
+              Navigator.of(context, rootNavigator: true).pop();
+              _dialogSetState = null;
+            }
+            // CRITICAL: Re-initialize chess engine to reset the board position
+            _chess = chess_lib.Chess(); 
             _moveHistory = "";
             _lastMoveFrom = null;
             _lastMoveTo = null;
@@ -135,7 +143,14 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
             _possibleMoves = [];
             _fenHistory = [_chess.fen]; 
             _opponentLeft = false; 
+            _opponentWantsRematch = false;
             HapticFeedback.vibrate();
+            print('[DEBUG] Board Reset Successful and UI Updated');
+          } else if (message == "REMATCH_REQUESTED") {
+            if (_dialogSetState != null) {
+               _opponentWantsRematch = true;
+               _dialogSetState!(() {});
+            }
           } else if (message.startsWith("OPPONENT_LEFT")) {
             print('[GAME] Opponent Left Event Received');
             _opponentLeft = true;
@@ -207,6 +222,35 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
         });
       }
     });
+  }
+
+  void _showResignDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF262421),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: const Text("Resign Party?", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        content: const Text("Are you sure you want to admit defeat?", style: TextStyle(color: Colors.white70)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("NO", style: TextStyle(color: Colors.white38)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _wsService.sendMove("RESIGN");
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFE94560),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text("YES", style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -337,9 +381,9 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
   bool isDraw = reason.contains("1/2-1/2");
 
   if (!isDraw) {
-    if (reason.contains("1-0")) {
+    if (reason.contains("1-0") || reason.contains("WhiteWon")) {
       isVictory = _myColor == "white";
-    } else if (reason.contains("0-1")) {
+    } else if (reason.contains("0-1") || reason.contains("BlackWon")) {
       isVictory = _myColor == "black";
     }
   }
@@ -447,6 +491,17 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
                       height: 1.4,
                     ),
                   ),
+                  if (_opponentWantsRematch && !_opponentLeft) ...[
+                    const SizedBox(height: 16),
+                    const Text(
+                      "Opponent wants a rematch!",
+                      style: TextStyle(
+                        color: Color(0xFFE94560),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 32),
                   SizedBox(
                     width: double.infinity,
@@ -466,9 +521,10 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
                         shadowColor: const Color(0xFFE94560).withValues(alpha: 0.4),
                       ),
                       onPressed: _opponentLeft ? null : () {
-                        Navigator.of(context).pop();
-                        _dialogSetState = null;
-                        _wsService.sendMove("RESTART");
+                        _wsService.sendMove("REMATCH");
+                        if (_dialogSetState != null) {
+                          _dialogSetState!(() {});
+                        }
                       },
                       child: Text(
                         _opponentLeft ? "OPPONENT LEFT" : "REMATCH",
@@ -566,6 +622,11 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.flag_outlined, color: Colors.white70),
+            tooltip: "Resign Game",
+            onPressed: _showResignDialog,
+          ),
           IconButton(
             icon: const Icon(Icons.refresh, color: Colors.white70),
             tooltip: "Restart Game",

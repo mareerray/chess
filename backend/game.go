@@ -24,22 +24,26 @@ type Player struct {
 }
 
 type Room struct {
-	ID        string
-	Game      *chess.Game
-	Players   map[*websocket.Conn]*Player // Conn -> Player info
-	writeMu   map[*websocket.Conn]*sync.Mutex // To serialize writes per connection
-	mu        sync.Mutex
-	started   bool
-	IsBotGame bool
-	BotColor  string
+	ID               string
+	Game             *chess.Game
+	Players          map[*websocket.Conn]*Player // Conn -> Player info
+	writeMu          map[*websocket.Conn]*sync.Mutex // To serialize writes per connection
+	mu               sync.Mutex
+	started          bool
+	IsBotGame        bool
+	BotColor         string
+	RematchRequested map[*websocket.Conn]bool
 }
 
-func NewRoom(id string) *Room {
+func NewRoom(id string, isBot bool) *Room {
 	return &Room{
-		ID:      id,
-		Game:    chess.NewGame(),
-		Players: make(map[*websocket.Conn]*Player),
-		writeMu: make(map[*websocket.Conn]*sync.Mutex),
+		ID:               id,
+		Game:             chess.NewGame(),
+		Players:          make(map[*websocket.Conn]*Player),
+		writeMu:          make(map[*websocket.Conn]*sync.Mutex),
+		IsBotGame:        isBot,
+		started:          false,
+		RematchRequested: make(map[*websocket.Conn]bool),
 	}
 }
 
@@ -130,6 +134,21 @@ func (r *Room) broadcastSafe(msg string) {
 	r.mu.Unlock()
 
 	for _, conn := range conns {
+		r.sendMessage(conn, msg)
+	}
+}
+
+func (r *Room) broadcastToOthers(exclude *websocket.Conn, msg string) {
+	r.mu.Lock()
+	var targets []*websocket.Conn
+	for conn := range r.Players {
+		if conn != exclude {
+			targets = append(targets, conn)
+		}
+	}
+	r.mu.Unlock()
+
+	for _, conn := range targets {
 		r.sendMessage(conn, msg)
 	}
 }
@@ -237,8 +256,41 @@ func (r *Room) handlePlayer(conn *websocket.Conn) {
 func (r *Room) processMove(conn *websocket.Conn, message string) {
 	moveStr := strings.TrimPrefix(message, "MOVE:")
 
-	if moveStr == "RESTART" {
-		r.Restart()
+	if moveStr == "RESTART" || moveStr == "REMATCH" {
+		r.mu.Lock()
+		r.RematchRequested[conn] = true
+		numRequested := len(r.RematchRequested)
+		numPlayers := len(r.Players)
+		isBot := r.IsBotGame
+		r.mu.Unlock()
+
+		if isBot || numPlayers <= 1 || numRequested >= 2 {
+			r.Restart()
+		} else {
+			// Notify other player that we want a rematch
+			r.broadcastToOthers(conn, "REMATCH_REQUESTED")
+		}
+		return
+	}
+
+	if moveStr == "RESIGN" {
+		r.mu.Lock()
+		player := r.Players[conn]
+		if player == nil {
+			r.mu.Unlock()
+			return
+		}
+		
+		score := "1-0"
+		outcome := "WhiteWon"
+		if player.Color == "white" {
+			score = "0-1"
+			outcome = "BlackWon"
+		}
+		r.mu.Unlock()
+		
+		msg := fmt.Sprintf("GAMEOVER:%s (%s) by Resignation", outcome, score)
+		r.Broadcast(msg)
 		return
 	}
 
@@ -383,6 +435,7 @@ func (r *Room) logGame() {
 func (r *Room) Restart() {
 	r.mu.Lock()
 	r.Game = chess.NewGame()
+	r.RematchRequested = make(map[*websocket.Conn]bool)
 	r.mu.Unlock()
 
 	log.Printf("Game restarted in room %s", r.ID)

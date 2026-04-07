@@ -72,7 +72,7 @@ func (gm *GameManager) matchmaking() {
 		gm.broadcastOnlinePlayers() // Notify others that these two left
 
 		roomID := strings.ToUpper(uuid.New().String()[:6])
-		room := NewRoom(roomID)
+		room := NewRoom(roomID, false)
 
 		gm.mu.Lock()
 		gm.rooms[roomID] = room
@@ -232,7 +232,7 @@ func (gm *GameManager) handleLobbyMessage(sender *Player, msg string) {
 			
 			// Create room
 			roomID := strings.ToUpper(uuid.New().String()[:6]) + "_INV"
-			room := NewRoom(roomID)
+			room := NewRoom(roomID, false)
 			
 			gm.mu.Lock()
 			gm.rooms[roomID] = room
@@ -254,7 +254,7 @@ func (gm *GameManager) handleLobbyMessage(sender *Player, msg string) {
 
 func (gm *GameManager) HandleCreate(w http.ResponseWriter, r *http.Request) {
 	roomID := strings.ToUpper(uuid.New().String()[:6]) // Short code for easier sharing
-	room := NewRoom(roomID)
+	room := NewRoom(roomID, false)
 
 	gm.mu.Lock()
 	gm.rooms[roomID] = room
@@ -267,7 +267,7 @@ func (gm *GameManager) HandleCreate(w http.ResponseWriter, r *http.Request) {
 
 func (gm *GameManager) HandlePractice(w http.ResponseWriter, r *http.Request) {
 	roomID := strings.ToUpper(uuid.New().String()[:6]) + "_BOT"
-	room := NewRoom(roomID)
+	room := NewRoom(roomID, true)
 	room.IsBotGame = true
 	room.BotColor = "black"
 
