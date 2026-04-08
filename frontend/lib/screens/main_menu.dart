@@ -44,7 +44,11 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
       } else if (message.startsWith('INVITE_DECLINED:')) {
         final name = message.split(':')[1];
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('$name declined your invitation'), backgroundColor: const Color(0xFFE94560)),
+          SnackBar(
+            content: Text('$name declined your invitation'), 
+            backgroundColor: const Color(0xFFE94560),
+            duration: const Duration(seconds: 2),
+          ),
         );
       } else if (message.startsWith('JOIN:')) {
         final parts = message.split(':');
@@ -170,7 +174,11 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                                   _wsService.sendInvite(player['id']);
                                   Navigator.pop(context);
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text('Invitation sent to ${player['name']}'), backgroundColor: const Color(0xFFE94560)),
+                                    SnackBar(
+                                      content: Text('Invitation sent to ${player['name']}'), 
+                                      backgroundColor: const Color(0xFFE94560),
+                                      duration: const Duration(seconds: 2),
+                                    ),
                                   );
                                 },
                                 style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE94560), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../services/profile_service.dart';
-import '../services/chess_pieces_svg.dart';
+// import '../services/chess_pieces_svg.dart';
 
 class ProfileSetupScreen extends StatefulWidget {
   const ProfileSetupScreen({super.key});
@@ -26,7 +26,9 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     final nickname = _nicknameController.text.trim();
     if (nickname.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a nickname')),
+        const SnackBar(content: Text('Please enter a nickname'),
+        duration: Duration(seconds: 2),
+        ),
       );
       return;
     }

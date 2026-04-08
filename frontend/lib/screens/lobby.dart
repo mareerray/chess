@@ -58,8 +58,6 @@ class _LobbyScreenState extends State<LobbyScreen> {
     Future.delayed(const Duration(milliseconds: 500), () {
       if (mounted) _wsService.joinPublicQueue();
     });
-
-    // _wsService.joinPublicQueue();
   }
 
   @override
