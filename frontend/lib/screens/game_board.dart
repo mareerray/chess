@@ -11,7 +11,7 @@ import '../services/chess_pieces_svg.dart';
 import '../services/profile_service.dart';
 
 part 'game_board_dialogs.dart'; 
-part 'game_baord_board.dart';
+part 'game_board_board.dart';
 
 class GameBoardScreen extends StatefulWidget {
   const GameBoardScreen({super.key});
