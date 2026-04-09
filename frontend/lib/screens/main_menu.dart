@@ -1,3 +1,5 @@
+// Widget → State variables → Lifecycle → Listener → Actions → Dialogs → Build
+
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -7,6 +9,8 @@ import 'package:provider/provider.dart';
 import '../services/profile_service.dart';
 import '../services/websocket_service.dart';
 
+// ─── Widget ───────────────────────────────────────────────────────────────────
+
 class MainMenuScreen extends StatefulWidget {
   const MainMenuScreen({super.key});
 
@@ -14,33 +18,64 @@ class MainMenuScreen extends StatefulWidget {
   State<MainMenuScreen> createState() => _MainMenuScreenState();
 }
 
+// ─── State ────────────────────────────────────────────────────────────────────
+
 class _MainMenuScreenState extends State<MainMenuScreen> {
+
+  // ── Services & Config ──────────────
+
   final String baseUrl = 'https://colory-kaci-dreadingly.ngrok-free.dev';
   final ProfileService _profileService = ProfileService();
   late WebSocketService _wsService;
   StreamSubscription? _roomSubscription;
+
+  // ── Lobby State ─────────────────────
+
   List<dynamic> _onlinePlayers = [];
+
+  // Returns the number of other players (excludes ourselves)
+  int get numOfOpponents {
+    return _onlinePlayers.where((player) => player['id'] != _profileService.deviceId).length;
+  }
+
+  // ── Lifecycle ─────────────────────────────────────────────────────────────────
 
   @override
   void initState() {
     super.initState();
     _wsService = Provider.of<WebSocketService>(context, listen: false);
     _wsService.connectLobby();
+    _setupLobbyListener();
+  }
 
+  @override
+  void dispose() {
+    _roomSubscription?.cancel();
+    super.dispose();
+  }
+
+  // ── Lobby Listener ────────────────────────────────────────────────────────────
+
+  void _setupLobbyListener() {
     _roomSubscription = _wsService.roomStream.listen((message) {
       if (!mounted) return;
       debugPrint('🔵 MAIN_MENU LOBBY MSG: $message');
 
+      // Updated list of who is currently online
       if (message.startsWith('ONLINE_PLAYERS:')) {
         final jsonStr = message.substring('ONLINE_PLAYERS:'.length);
         setState(() {
           _onlinePlayers = json.decode(jsonStr);
         });
+
+      // Another player sent us a challenge
       } else if (message.startsWith('INVITE_FROM:')) {
         final parts = message.split(':');
         if (parts.length >= 4) {
           _showInviteDialog(parts[1], parts[2], parts[3]);
         }
+      
+      // The player we invited said no
       } else if (message.startsWith('INVITE_DECLINED:')) {
         final name = message.split(':')[1];
         ScaffoldMessenger.of(context).showSnackBar(
@@ -50,6 +85,8 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
             duration: const Duration(seconds: 2),
           ),
         );
+
+      // Invite was accepted — navigate to the game room
       } else if (message.startsWith('JOIN:')) {
         final parts = message.split(':');
         if (parts.length >= 3) {
@@ -64,16 +101,51 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     });
   }
 
-  @override
-  void dispose() {
-    _roomSubscription?.cancel();
-    super.dispose();
+  // ── Room Actions ──────────────────────────────────────────────────────────────
+
+  // Creates a new private room and navigates there as white
+  Future<void> _createRoom(BuildContext context) async {
+    try {
+      final response = await http.get(Uri.parse('$baseUrl/create'));
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final roomID = data['roomID'];
+        if (context.mounted) {
+          Navigator.pushNamed(context, '/game', arguments: '$roomID:white');
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error creating room: $e')),
+        );
+      }
+    }
   }
 
-  int get numOfOpponents {
-    return _onlinePlayers.where((player) => player['id'] != _profileService.deviceId).length;
+  // Starts a solo practice session against the bot
+  Future<void> _startPractice(BuildContext context) async {
+    try {
+      final response = await http.get(Uri.parse('$baseUrl/practice'));
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final roomID = data['roomID'];
+        if (context.mounted) {
+          Navigator.pushNamed(context, '/game', arguments: '$roomID:white');
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error starting practice: $e')),
+        );
+      }
+    }
   }
 
+  // ── Dialogs & Sheets ──────────────────────────────────────────────────────────
+
+  // Shows a dialog when someone challenges us to a game
   void _showInviteDialog(String challengerId, String challengerName, String challengerAvatar) {
     showDialog(
       context: context,
@@ -119,6 +191,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     );
   }
 
+  // Shows a bottom sheet listing all currently online players
   void _showOnlinePlayers() {
     showModalBottomSheet(
       context: context,
@@ -197,44 +270,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     );
   }
 
-  Future<void> _createRoom(BuildContext context) async {
-    try {
-      final response = await http.get(Uri.parse('$baseUrl/create'));
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final roomID = data['roomID'];
-        if (context.mounted) {
-          Navigator.pushNamed(context, '/game', arguments: '$roomID:white');
-        }
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error creating room: $e')),
-        );
-      }
-    }
-  }
-
-  Future<void> _startPractice(BuildContext context) async {
-    try {
-      final response = await http.get(Uri.parse('$baseUrl/practice'));
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final roomID = data['roomID'];
-        if (context.mounted) {
-          Navigator.pushNamed(context, '/game', arguments: '$roomID:white');
-        }
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error starting practice: $e')),
-        );
-      }
-    }
-  }
-
+  // Shows a dialog to enter a private room code and join as black
   void _showJoinDialog(BuildContext context) {
     final controller = TextEditingController();
     showDialog(
@@ -266,6 +302,8 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     );
   }
 
+  // ── Build ─────────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -280,7 +318,8 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
         child: SafeArea(
           child: Stack(
             children: [
-              // Online Players Button in Top Right
+
+              // ── Online Players Button (top-right) ────────────────────────
               Positioned(
                 top: 16,
                 right: 16,
@@ -294,6 +333,8 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                   ),
                 ),
               ),
+
+              // Online count badge on the button
               if (_onlinePlayers.isNotEmpty)
                 Positioned(
                   top: 12,
@@ -307,12 +348,14 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                     ),
                   ),
                 ),
+
+              // ── Main Content ─────────────────────────────────────────────
               Center(
                 child: SingleChildScrollView(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // Profile Header
+                      // Profile header — tap to edit
                       GestureDetector(
                         onTap: () => Navigator.pushNamed(context, '/setup'),
                         child: Column(
@@ -347,6 +390,8 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                         ),
                       ),
                       const SizedBox(height: 48),
+
+                      // App title
                       const Text(
                         'CHESS',
                         style: TextStyle(
@@ -357,6 +402,8 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                         ),
                       ),
                       const SizedBox(height: 48),
+
+                      // ── Menu Buttons ───────────────────────────────────
                       _MenuButton(
                         title: 'PUBLIC MATCH',
                         onPressed: () => Navigator.pushNamed(context, '/lobby'),
@@ -387,6 +434,8 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     );
   }
 }
+
+// ─── Reusable Menu Button ─────────────────────────────────────────────────────
 
 class _MenuButton extends StatelessWidget {
   final String title;

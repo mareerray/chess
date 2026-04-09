@@ -5,7 +5,7 @@ import 'services/profile_service.dart';
 import 'screens/main_menu.dart';
 import 'screens/lobby.dart';
 import 'screens/game_board.dart';
-import 'screens/profile_setup_screen.dart';
+import 'screens/profile_setup.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

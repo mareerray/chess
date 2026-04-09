@@ -130,7 +130,7 @@ extension _GameBoardBoard on _GameBoardScreenState {
 
   // Converts piece → SVG widget
   Widget _renderSvgPiece(chess_lib.Piece piece, {bool isSmall = false}) {
-    String svgCode = _getSvgForPiece(piece);
+    String svgCode = PieceSvg.getSvgForPiece(piece);
     return Padding(
       padding: EdgeInsets.all(isSmall ? 1.0 : 4.0),
       child: SvgPicture.string(
@@ -141,20 +141,6 @@ extension _GameBoardBoard on _GameBoardScreenState {
         ),
       ),
     );
-  }
-
-  // 	Maps piece type → SVG string
-  String _getSvgForPiece(chess_lib.Piece piece) {
-    final isWhite = piece.color == chess_lib.Color.WHITE;
-    switch (piece.type) {
-      case chess_lib.PieceType.PAWN: return isWhite ? PieceSvg.wP : PieceSvg.bP;
-      case chess_lib.PieceType.ROOK: return isWhite ? PieceSvg.wR : PieceSvg.bR;
-      case chess_lib.PieceType.KNIGHT: return isWhite ? PieceSvg.wN : PieceSvg.bN;
-      case chess_lib.PieceType.BISHOP: return isWhite ? PieceSvg.wB : PieceSvg.bB;
-      case chess_lib.PieceType.QUEEN: return isWhite ? PieceSvg.wQ : PieceSvg.bQ;
-      case chess_lib.PieceType.KING: return isWhite ? PieceSvg.wK : PieceSvg.bK;
-      default: return "";
-    }
   }
 
   // 	Renders a piece choice widget (uses _renderSvgPiece)

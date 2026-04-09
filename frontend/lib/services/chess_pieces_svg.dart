@@ -1,7 +1,27 @@
 // ignore_for_file: constant_identifier_names
-/// SVG strings for all 12 chess pieces (Staunton style with 3D radial gradients)
+// SVG strings for all 12 chess pieces (Staunton style with 3D radial gradients)
+
+import 'package:chess/chess.dart' as chess_lib;
+
+
 class PieceSvg {
   PieceSvg._();
+
+  // Resolves any chess piece to its SVG string
+  static String getSvgForPiece(chess_lib.Piece piece) {
+    final bool isWhite = piece.color == chess_lib.Color.WHITE;
+    switch (piece.type) {
+      case chess_lib.PieceType.PAWN:   return isWhite ? wP : bP;
+      case chess_lib.PieceType.ROOK:   return isWhite ? wR : bR;
+      case chess_lib.PieceType.KNIGHT: return isWhite ? wN : bN;
+      case chess_lib.PieceType.BISHOP: return isWhite ? wB : bB;
+      case chess_lib.PieceType.QUEEN:  return isWhite ? wQ : bQ;
+      case chess_lib.PieceType.KING:   return isWhite ? wK : bK;
+      default: return "";
+    }
+  }
+
+  // ── WHITE ──────────────────────────────────────────────────────────────────
 
   // ── WHITE PAWN ──────────────────────────────────────────────────────────────
   static const String wP = '''
@@ -167,6 +187,8 @@ class PieceSvg {
       style="fill:none;stroke:#000000;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;"/>
   </g>
 </svg>''';
+
+ // ── BLACK ──────────────────────────────────────────────────────────────────
 
   // ── BLACK PAWN ──────────────────────────────────────────────────────────────
   static const String bP = '''

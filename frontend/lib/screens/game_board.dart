@@ -1,3 +1,5 @@
+// Widget → State variables → Lifecycle → WebSocket → Move logic → Build → Player panel → Stubs
+
 import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
@@ -65,6 +67,7 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
   late ImageProvider _darkSquareImg;
 
   // ── Lifecycle ────────────────────────────────────────────────────────────────
+  
   @override
   void initState() {
     super.initState();
