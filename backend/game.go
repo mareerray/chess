@@ -245,8 +245,8 @@ func (r *Room) handlePlayer(conn *websocket.Conn) {
 		// Only process moves if the game has started or it's a management command
         msgStr := string(msg)
         isMgmt := strings.Contains(msgStr, "RESTART") || 
-                  strings.Contains(msgStr, "REMATCH") || 
-                  strings.Contains(msgStr, "RESIGN")
+				strings.Contains(msgStr, "REMATCH") || 
+				strings.Contains(msgStr, "RESIGN")
 
 		if !r.started && !isMgmt {
 			continue

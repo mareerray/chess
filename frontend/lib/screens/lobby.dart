@@ -142,12 +142,15 @@ class _LobbyScreenState extends State<LobbyScreen> {
     }
 
     setState(() {
-      final success = _chess.move({
+      final Map<String, String> move = {
         "from": from, 
         "to": to, 
-        if (promotion != null) "promotion": promotion,
-        });
+      };
       
+      if (promotion != null) move["promotion"] = promotion;
+
+      final success = _chess.move(move);
+
       if (success) {
         _lastMoveFrom = from;
         _lastMoveTo = to;
