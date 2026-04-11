@@ -1,3 +1,5 @@
+// Widget → State variables → Lifecycle → Listener → Logic → Dialogs → Build → Board widgets
+
 import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
@@ -7,6 +9,8 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../services/websocket_service.dart';
 import '../services/chess_pieces_svg.dart';
 
+// ─── Widget ───────────────────────────────────────────────────────────────────
+
 class LobbyScreen extends StatefulWidget {
   const LobbyScreen({super.key});
 
@@ -14,60 +18,82 @@ class LobbyScreen extends StatefulWidget {
   State<LobbyScreen> createState() => _LobbyScreenState();
 }
 
+// ─── State ────────────────────────────────────────────────────────────────────
+
 class _LobbyScreenState extends State<LobbyScreen> {
+
+  // ── Services ─────────────────────────────
   late WebSocketService _wsService;
   StreamSubscription? _roomSubscription;
-  
-  // Local state for warmup
+  bool _navigating = false;
+
+  // ── Warmup Chess Engine ──────────────────
   late chess_lib.Chess _chess;
   String? _selectedSquare;
   List<Map<String, dynamic>> _possibleMovesData = [];
   String? _lastMoveFrom;
   String? _lastMoveTo;
-  
+
+  // ── Board Textures ─────────────────────────
   late ImageProvider _lightSquareImg;
   late ImageProvider _darkSquareImg;
+
+  // ── Lifecycle ─────────────────────────────────────────────────────────────────
 
   @override
   void initState() {
     super.initState();
+    // Initialize warmup board
     _chess = chess_lib.Chess();
     _lightSquareImg = const AssetImage('assets/board/light_square.png');
     _darkSquareImg = const AssetImage('assets/board/dark_square.png');
     
     _wsService = Provider.of<WebSocketService>(context, listen: false);
-    _wsService.prepareNewSession(); // Clear any stale connections
-    _wsService.connectToLobby('wss://colory-kaci-dreadingly.ngrok-free.dev/rooms');
-    
-    // Start listening immediately - the WebSocketService connection tracking handles safety
-    if (!mounted) return;
-    _roomSubscription = _wsService.roomStream.listen((message) {
-      if (!mounted) return;
-      
-      final parts = message.split(':');
-      if (parts.length >= 3 && parts[0] == 'JOIN') {
-        final roomID = parts[1];
-        final assignedColor = parts[2];
-        Navigator.pushReplacementNamed(
-          context, 
-          '/game', 
-          arguments: '$roomID:$assignedColor',
-        );
-      }
+    _setupMatchmakingListener();
+
+    // Short delay to ensure lobby connection is ready before joining queue
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (mounted) _wsService.joinPublicQueue();
     });
   }
 
   @override
   void dispose() {
     _roomSubscription?.cancel();
-    _wsService.disconnectLobby();
+    _wsService.leavePublicQueue();
     super.dispose();
   }
 
+  // ── Matchmaking Listener ──────────────────────────────────────────────────────
+
+  void _setupMatchmakingListener() {
+    _roomSubscription = _wsService.roomStream.listen((message) {
+      if (!mounted) return;
+      debugPrint('🟡 LOBBY MSG: $message');
+      
+      // Server found a match — navigate to the game room
+      final parts = message.split(':');
+      if (parts.length >= 3 && parts[0] == 'JOIN') {
+        if (_navigating) return;
+        _navigating = true;
+        Navigator.pushReplacementNamed(
+          context, 
+          '/game', 
+          arguments: '${parts[1]}:${parts[2]}',
+        );
+      }
+    });
+  }
+
+  // ── Warmup Move Logic ─────────────────────────────────────────────────────────
+
+  // Handles a tap on a warmup board square — select, deselect, or move
   void _onSquareTap(String square) {
     if (_chess.game_over) return;
+
     setState(() {
       if (_selectedSquare == null) {
+        // First tap — select a white piece
         final piece = _chess.get(square);
         if (piece != null && piece.color == chess_lib.Color.WHITE) {
           _selectedSquare = square;
@@ -80,11 +106,13 @@ class _LobbyScreenState extends State<LobbyScreen> {
         } else {
           final moveIndex = _possibleMovesData.indexWhere((m) => m["to"] == square);
           if (moveIndex != -1) {
+            // Valid target — execute the move
             final moveData = _possibleMovesData[moveIndex];
             _handleMove(_selectedSquare!, square, moveData);
             _selectedSquare = null;
             _possibleMovesData = [];
           } else {
+            // Tap another white piece — switch selection
             final piece = _chess.get(square);
             if (piece != null && piece.color == chess_lib.Color.WHITE) {
               _selectedSquare = square;
@@ -99,32 +127,77 @@ class _LobbyScreenState extends State<LobbyScreen> {
     });
   }
 
+  // Executes the player's move; handles promotion if needed, then triggers bot reply
   void _handleMove(String from, String to, Map<String, dynamic> moveData) async {
     if (_chess.game_over) return;
+
     String? promotion;
     
-    // Check if the engine flags this move as a promotion
-    bool isPromotion = (moveData["flags"] as String).contains("p") || moveData.containsKey("promotion");
+    // Check if this move requires a pawn promotion
+    final bool isPromotion = (moveData["flags"] as String).contains("p") || moveData.containsKey("promotion");
     
     if (isPromotion) {
       promotion = await _showPromotionDialog(chess_lib.Color.WHITE);
-      if (promotion == null) return;
+      if (promotion == null) return; // Player cancelled
     }
 
     setState(() {
-      final success = _chess.move({"from": from, "to": to, if (promotion != null) "promotion": promotion});
+      final Map<String, String> move = {
+        "from": from, 
+        "to": to, 
+      };
+      
+      if (promotion != null) move["promotion"] = promotion;
+
+      final success = _chess.move(move);
+
       if (success) {
         _lastMoveFrom = from;
         _lastMoveTo = to;
         if (_chess.game_over) {
           _showGameOver();
         } else {
+          // Short pause before bot replies, so the move feels natural
           Timer(const Duration(milliseconds: 800), _makeMiniBotMove);
         }
       }
     });
   }
 
+  // Makes a random move for the bot opponent in the warmup game
+  void _makeMiniBotMove() {
+    if (!mounted || _chess.game_over) return;
+
+    final moves = _chess.moves({"verbose": true});
+    if (moves.isEmpty) return;
+    
+    setState(() {
+      final moveList = List.from(moves);
+      moveList.shuffle();
+      final move = moveList.first;
+      _chess.move(move);
+      _lastMoveFrom = move["from"] as String;
+      _lastMoveTo = move["to"] as String;
+      if (_chess.game_over) {
+        _showGameOver();
+      }
+    });
+  }
+
+  // Resets the warmup board back to the starting position
+  void _resetWarmup() {
+    setState(() {
+      _chess = chess_lib.Chess();
+      _selectedSquare = null;
+      _possibleMovesData = [];
+      _lastMoveFrom = null;
+      _lastMoveTo = null;
+    });
+  }
+
+  // ── Dialogs ───────────────────────────────────────────────────────────────────
+
+  // Shows game-over result with an option to restart the warmup
   void _showGameOver() {
     String reason = "Game Over";
     if (_chess.in_checkmate) {
@@ -149,7 +222,8 @@ class _LobbyScreenState extends State<LobbyScreen> {
                 Navigator.of(context).pop();
                 _resetWarmup();
               },
-              child: const Text("RESTART", style: TextStyle(color: Color(0xFFE94560), fontWeight: FontWeight.bold)),
+              child: const Text("RESTART", 
+              style: TextStyle(color: Color(0xFFE94560), fontWeight: FontWeight.bold)),
             ),
           ],
         ),
@@ -157,6 +231,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
     );
   }
 
+  // Lets the player pick a piece to promote their pawn to
   Future<String?> _showPromotionDialog(chess_lib.Color color) async {
     return showDialog<String>(
       context: context,
@@ -183,55 +258,20 @@ class _LobbyScreenState extends State<LobbyScreen> {
     );
   }
 
+  // Builds a single tappable piece option inside the promotion dialog
   Widget _promotionOption(chess_lib.PieceType type, chess_lib.Color color, String code) {
-    bool isWhite = color == chess_lib.Color.WHITE;
-    String svg = "";
-    switch (type) {
-      case chess_lib.PieceType.QUEEN: svg = isWhite ? PieceSvg.wQ : PieceSvg.bQ; break;
-      case chess_lib.PieceType.KNIGHT: svg = isWhite ? PieceSvg.wN : PieceSvg.bN; break;
-      case chess_lib.PieceType.ROOK: svg = isWhite ? PieceSvg.wR : PieceSvg.bR; break;
-      case chess_lib.PieceType.BISHOP: svg = isWhite ? PieceSvg.wB : PieceSvg.bB; break;
-      default: break;
-    }
-
     return GestureDetector(
       onTap: () => Navigator.of(context).pop(code),
       child: Container(
         padding: const EdgeInsets.all(8),
         width: 54, height: 54,
         decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(8)),
-        child: SvgPicture.string(svg),
+        child: SvgPicture.string(PieceSvg.getSvgForPiece(chess_lib.Piece(type, color))),
       ),
     );
   }
 
-  void _makeMiniBotMove() {
-    if (!mounted || _chess.game_over) return;
-    final moves = _chess.moves({"verbose": true});
-    if (moves.isEmpty) return;
-    
-    setState(() {
-      final moveList = List.from(moves);
-      moveList.shuffle();
-      final move = moveList.first;
-      _chess.move(move);
-      _lastMoveFrom = move["from"] as String;
-      _lastMoveTo = move["to"] as String;
-      if (_chess.game_over) {
-        _showGameOver();
-      }
-    });
-  }
-
-  void _resetWarmup() {
-    setState(() {
-      _chess = chess_lib.Chess();
-      _selectedSquare = null;
-      _possibleMovesData = [];
-      _lastMoveFrom = null;
-      _lastMoveTo = null;
-    });
-  }
+  // ── Build ─────────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -241,28 +281,70 @@ class _LobbyScreenState extends State<LobbyScreen> {
       body: SafeArea(
         child: Column(
           children: [
+
+            // ── Header — matchmaking status ─────────────────
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 32),
+              padding: const EdgeInsets.symmetric(vertical: 16),
               child: Column(
                 children: [
-                   const Text("Matching...", style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
-                   const SizedBox(height: 8),
-                   Text(
-                     isGameOver ? "Warm up ended!" : "Warm up while you wait", 
-                     style: TextStyle(color: isGameOver ? const Color(0xFFE94560) : Colors.white54, fontSize: 16),
-                   ),
+                  const Text("Matching...", style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  Text(
+                    isGameOver ? "Warm up ended!" : "Warm up with Bot while you wait", 
+                    style: TextStyle(color: isGameOver ? const Color(0xFFE94560) : Colors.white54, fontSize: 16),
+                  ),
+
+                  // ── Turn indicator ──────────────────────────
+                  if (!isGameOver) ...[
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          width: 10,
+                          height: 10,
+                          decoration: BoxDecoration(
+                            color: _chess.turn == chess_lib.Color.WHITE
+                                ? Colors.white
+                                : Colors.black,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white38),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          _chess.turn == chess_lib.Color.WHITE
+                              ? "Your turn"
+                              : "Bot is thinking...",
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
+
+            // ── Warmup board ─────────────────────────────────
             Expanded(
               child: _buildBoard(),
             ),
+
+            // ── Footer — spinner + cancel button ─────────────
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 32),
+              padding: const EdgeInsets.symmetric(vertical: 16),
               child: Column(
                 children: [
                   const CircularProgressIndicator(color: Color(0xFFE94560)),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 12),
+                  const Text(
+                    "Searching for an opponent...",
+                    style: TextStyle(color: Colors.white54, fontSize: 14),
+                  ),
+                  const SizedBox(height: 12),
                   OutlinedButton(
                     style: OutlinedButton.styleFrom(
                       side: const BorderSide(color: Colors.white24),
@@ -270,7 +352,10 @@ class _LobbyScreenState extends State<LobbyScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: () {
+                      _wsService.leavePublicQueue();
+                      Navigator.pop(context);
+                    },
                     child: const Text("CANCEL SEARCH"),
                   ),
                 ],
@@ -282,6 +367,9 @@ class _LobbyScreenState extends State<LobbyScreen> {
     );
   }
 
+  // ── Board Widgets ─────────────────────────────────────────────────────────────
+
+  // Builds the full 8x8 warmup board grid
   Widget _buildBoard() {
     double size = MediaQuery.of(context).size.width - 32;
     return Center(
@@ -308,6 +396,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
     );
   }
 
+  // Builds a single square with its texture, highlights, piece, and move dot
   Widget _buildSquare(String square, bool isDark, int row, int col) {
     bool isSelected = _selectedSquare == square;
     bool isPossible = _possibleMovesData.any((m) => m["to"] == square);
@@ -324,25 +413,12 @@ class _LobbyScreenState extends State<LobbyScreen> {
           color: isSelected ? Colors.orange.withValues(alpha: 0.5) : (isLastMove ? Colors.yellow.withValues(alpha: 0.2) : Colors.transparent),
           child: Stack(
             children: [
-              if (piece != null) Center(child: Padding(padding: const EdgeInsets.all(4), child: SvgPicture.string(_getSvgForPiece(piece)))),
-              if (isPossible) Center(child: Container(width: 12, height: 12, decoration: const BoxDecoration(color: Colors.black26, shape: BoxShape.circle))),
+              if (piece != null) Center(child: Padding(padding: const EdgeInsets.all(4), child: SvgPicture.string(PieceSvg.getSvgForPiece(piece)))),
+              if (isPossible) Center(child: Container(width: 12, height: 12, decoration: const BoxDecoration(color: Colors.orange, shape: BoxShape.circle))),
             ],
           ),
         ),
       ),
     );
-  }
-
-  String _getSvgForPiece(chess_lib.Piece piece) {
-    bool isW = piece.color == chess_lib.Color.WHITE;
-    switch (piece.type) {
-      case chess_lib.PieceType.PAWN: return isW ? PieceSvg.wP : PieceSvg.bP;
-      case chess_lib.PieceType.ROOK: return isW ? PieceSvg.wR : PieceSvg.bR;
-      case chess_lib.PieceType.KNIGHT: return isW ? PieceSvg.wN : PieceSvg.bN;
-      case chess_lib.PieceType.BISHOP: return isW ? PieceSvg.wB : PieceSvg.bB;
-      case chess_lib.PieceType.QUEEN: return isW ? PieceSvg.wQ : PieceSvg.bQ;
-      case chess_lib.PieceType.KING: return isW ? PieceSvg.wK : PieceSvg.bK;
-      default: return "";
-    }
   }
 }
