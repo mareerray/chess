@@ -102,6 +102,6 @@ go run .
 > **Note:** `lsof -i :8080` shows a table — look for the value in the `PID` column, not the port number.
 
 ## Authors:
-[Kateryna Ovsiienko](https://github.com/kateryna256)
+[Kateryna Ovsiienko](https://github.com/mavka1207)
 
 [Mayuree reunsati](https://github.com/mareerray)
