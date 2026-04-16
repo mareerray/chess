@@ -24,7 +24,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
 
   // ── Services & Config ──────────────
 
-  final String baseUrl = 'https://colory-kaci-dreadingly.ngrok-free.dev';
+  final String baseUrl = 'https://chess-atv1.onrender.com';
   final ProfileService _profileService = ProfileService();
   late WebSocketService _wsService;
   StreamSubscription? _roomSubscription;

@@ -30,6 +30,12 @@ func main() {
 	gameManager := NewGameManager()
 
 	// ── Routes ────────────────────────────────────────────────────────────────
+	// defining a health check endpoint for web services
+	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("ok"))
+	})
+
 	http.HandleFunc("/create", gameManager.HandleCreate) // creates a new private game room
 	http.HandleFunc("/practice", gameManager.HandlePractice) // starts a solo practice session against the bot
 	http.HandleFunc("/rooms", gameManager.HandleLobby) // lobby WebSocket for matchmaking and invites

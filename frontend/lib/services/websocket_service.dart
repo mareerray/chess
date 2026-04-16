@@ -10,7 +10,7 @@ class WebSocketService {
 
   // ── Config ────────────────────────────────────────────────────────────────────
 
-  static const String serverUrl = 'colory-kaci-dreadingly.ngrok-free.dev';
+  static const String serverUrl = 'chess-atv1.onrender.com';
 
   // ── Channels ──────────────────────────────────────────────────────────────────
   WebSocketChannel? _lobbyChannel;
