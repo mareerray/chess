@@ -389,7 +389,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 48),
+                      const SizedBox(height: 40),
 
                       // App title
                       const Text(
@@ -401,7 +401,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                           letterSpacing: 12,
                         ),
                       ),
-                      const SizedBox(height: 48),
+                      const SizedBox(height: 40),
 
                       // ── Menu Buttons ───────────────────────────────────
                       _MenuButton(

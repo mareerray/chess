@@ -34,8 +34,8 @@ class AppShell extends StatelessWidget {
 
   Future<void> _openLink(String url) async {
     final uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      throw Exception('Could not launch $url');
     }
   }
 
