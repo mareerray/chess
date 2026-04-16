@@ -15,6 +15,8 @@ A real-time multiplayer chess application built with a **Flutter** frontend and 
 1.  **Frontend (`/frontend`)**: Developed in Flutter. It connects to the Go server using the `web_socket_channel` package and visualizes the board using SVG assets.
 2.  **Backend (`/backend`)**: Developed in Golang. It acts as the WebSocket server, managing concurrent game rooms, matchmaking queues, and dispatching PGN/FEN states between players.
 
+<img src="frontend/assets/chess_app.png"/>
+
 ## 🚀 Prerequisites
 
 To run this project locally, you will need:
