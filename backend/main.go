@@ -18,6 +18,35 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
+// ── CORS Middleware ───────────────────────────────────────────────────────────
+
+// corsMiddleware allows the browser to talk to our backend from a different domain.
+// Without this, browsers block all requests coming from the Flutter web app.
+// It wraps every route handler and adds the necessary "permission" headers.
+func corsMiddleware(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+        // Tell the browser: "Any website is allowed to call this server"
+        w.Header().Set("Access-Control-Allow-Origin", "*")
+
+        // Tell the browser: "These are the HTTP methods we accept"
+        w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+
+        // Tell the browser: "Content-Type header is allowed in requests"
+        w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+        // Before every real request, the browser sends a "preflight" OPTIONS request
+        // to check if the server allows the call. We just say yes and stop here.
+        if r.Method == http.MethodOptions {
+            w.WriteHeader(http.StatusOK)
+            return
+        }
+
+        // If it is a normal request (not OPTIONS), pass it to the actual handler
+        next.ServeHTTP(w, r)
+    })
+}
+
 // ── Entry Point ───────────────────────────────────────────────────────────────
 
 func main() {
@@ -43,7 +72,7 @@ func main() {
 
 	log.Printf("Server starting on port %s", port)
 	
-	if err := http.ListenAndServe(":"+port, nil); err != nil {
+	if err := http.ListenAndServe(":"+port, corsMiddleware(http.DefaultServeMux)); err != nil {
 		log.Fatal("ListenAndServe: ", err)
 	}
 }
