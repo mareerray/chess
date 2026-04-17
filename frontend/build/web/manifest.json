@@ -1,6 +1,6 @@
 {
-    "name": "chess_frontend",
-    "short_name": "chess_frontend",
+    "name": "CHESS",
+    "short_name": "CHESS",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
