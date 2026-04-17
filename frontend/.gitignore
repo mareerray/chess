@@ -44,3 +44,5 @@ app.*.map.json
 
 # Exceptions to above rules.
 !/packages/*/lib/src/generated/
+!build/web
+!build/web/**
