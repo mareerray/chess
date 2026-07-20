@@ -42,7 +42,14 @@ class AppShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: child, // 👈 the actual screen goes here
+      //body: child, // 👈 the actual screen goes here
+      backgroundColor: const Color(0xFF1a1a1a),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 600),
+          child: child, // 👈 the actual screen goes here
+        ),
+      ),
       bottomNavigationBar: Container(
         color: Colors.black.withValues(alpha: 0.92),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
