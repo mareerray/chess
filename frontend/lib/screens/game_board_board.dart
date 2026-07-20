@@ -7,7 +7,10 @@ extension _GameBoardBoard on _GameBoardScreenState {
   // ── Board Layout ──────────────────────────────────────────────────────────
   // Draws the grid
   Widget _buildBoard() {
-    double size = MediaQuery.of(context).size.width - 32;
+    double screenWidth = MediaQuery.of(context).size.width;
+    double screenHeight = MediaQuery.of(context).size.height;
+    double size = (screenWidth < screenHeight ? screenWidth: screenHeight) - 32;
+    size = size > 600 ? 600: size; // cap max board size on desktop
     return Container(
       width: size,
       height: size,
