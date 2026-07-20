@@ -163,145 +163,148 @@ extension _GameBoardDialogs on _GameBoardScreenState {
             child: Dialog(
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
               backgroundColor: const Color(0xFF262421).withValues(alpha: 0.95),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: mainColor.withValues(alpha: 0.1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        icon,
-                        size: 48,
-                        color: mainColor,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        color: mainColor,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      friendlyReason,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        color: Colors.white70,
-                        height: 1.4,
-                      ),
-                    ),
-                    if (_opponentWantsRematch && !_opponentLeft) ...[
-                      const SizedBox(height: 16),
-                      const Text(
-                        "Opponent wants a rematch! \nPress REMATCH to accept.",
-                        style: TextStyle(
-                          color: Color(0xFFE94560),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 32),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 52,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _opponentLeft
-                              ? Colors.white10
-                              : const Color(0xFFE94560),
-                          foregroundColor: _opponentLeft
-                              ? Colors.white30
-                              : Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 380),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                    child: Column (
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: mainColor.withValues(alpha: 0.1),
+                            shape: BoxShape.circle,
                           ),
-                          elevation: _opponentLeft ? 0 : 8,
-                          shadowColor: const Color(0xFFE94560).withValues(alpha: 0.4),
+                          child: Icon(
+                            icon,
+                            size: 48,
+                            color: mainColor,
+                          ),
                         ),
-                        onPressed: (_opponentLeft || _rematchRequestedByMe) ? null : () {
-                          _wsService.sendMove("REMATCH");
-                        },
-                        child: Text(
-                          _opponentLeft 
-                            ? "OPPONENT LEFT" 
-                            : _rematchRequestedByMe 
-                              ? "PENDING..." 
-                              : "REMATCH",
+                        const SizedBox(height: 24),
+                        Text(
+                          title,
+                          style: TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                            color: mainColor,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          friendlyReason,
+                          textAlign: TextAlign.center,
                           style: const TextStyle(
                             fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1.1,
+                            color: Colors.white70,
+                            height: 1.4,
                           ),
                         ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 52,
-                      child: OutlinedButton(
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: Color(0xFF27AE60), width: 1.5),
-                          foregroundColor: const Color(0xFF27AE60),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
+                        if (_opponentWantsRematch && !_opponentLeft) ...[
+                          const SizedBox(height: 16),
+                          const Text(
+                            "Opponent wants a rematch! \nPress REMATCH to accept.",
+                            style: TextStyle(
+                              color: Color(0xFFE94560),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
                           ),
-                          textStyle: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1.1,
-                          ),
-                        ),
-                        onPressed: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) => AnalysisScreen(
-                                fenHistory: _fenHistory,
-                                moveHistory: _moveHistory,
-                                myColor: _myColor,
+                        ],
+                        const SizedBox(height: 32),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 52,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: _opponentLeft
+                                  ? Colors.white10
+                                  : const Color(0xFFE94560),
+                              foregroundColor: _opponentLeft
+                                  ? Colors.white30
+                                  : Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              elevation: _opponentLeft ? 0 : 8,
+                              shadowColor: const Color(0xFFE94560).withValues(alpha: 0.4),
+                            ),
+                            onPressed: (_opponentLeft || _rematchRequestedByMe) ? null : () {
+                              _wsService.sendMove("REMATCH");
+                            },
+                            child: Text(
+                              _opponentLeft 
+                                ? "OPPONENT LEFT" 
+                                : _rematchRequestedByMe 
+                                  ? "PENDING..." 
+                                  : "REMATCH",
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 1.1,
                               ),
                             ),
-                          );
-                        },
-                        child: const Text("ANALYZE"),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 52,
-                      child: OutlinedButton(
-                        style: OutlinedButton.styleFrom(
-                          side: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
-                          foregroundColor: Colors.white70,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          textStyle: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
                           ),
                         ),
-                        onPressed: () {
-                          _dialogSetState = null;
-                          Navigator.of(context).popUntil((route) => route.isFirst);
-                        },
-                        child: const Text("MAIN MENU"),
-                      ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 52,
+                          child: OutlinedButton(
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(color: Color(0xFF27AE60), width: 1.5),
+                              foregroundColor: const Color(0xFF27AE60),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              textStyle: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 1.1,
+                              ),
+                            ),
+                            onPressed: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (context) => AnalysisScreen(
+                                    fenHistory: _fenHistory,
+                                    moveHistory: _moveHistory,
+                                    myColor: _myColor,
+                                  ),
+                                ),
+                              );
+                            },
+                            child: const Text("ANALYZE"),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 52,
+                          child: OutlinedButton(
+                            style: OutlinedButton.styleFrom(
+                              side: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+                              foregroundColor: Colors.white70,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              textStyle: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            onPressed: () {
+                              _dialogSetState = null;
+                              Navigator.of(context).popUntil((route) => route.isFirst);
+                            },
+                            child: const Text("MAIN MENU"),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
               ),
             ),
           );
