@@ -103,7 +103,7 @@ class ChessApp extends StatelessWidget {
     final profileService = ProfileService();
     
     return MaterialApp(
-      title: 'Chess Mobile',
+      title: 'GoChess',
       debugShowCheckedModeBanner: false,
 
       // ── Theme ──────────────────────────────────────────────────────────────
